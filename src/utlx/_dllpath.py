@@ -32,8 +32,13 @@ def python_dll_path() -> Path | None:
 
     The module must have been loaded by the current process.
     """
-    import ctypes as ct
-    return dll_path(ct.pythonapi._handle)
+    try:
+        from ctypes import pythonapi
+    except ImportError:  # pragma: no cover
+        from sys import dllhandle
+    else:
+        dllhandle = pythonapi._handle
+    return dll_path(dllhandle)
 
 
 del HMODULE

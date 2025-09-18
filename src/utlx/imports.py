@@ -1,6 +1,7 @@
 # Copyright (c) 2012 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
+from typing import TypeAlias
 from os import PathLike
 import sys
 import types
@@ -8,6 +9,8 @@ import importlib.util
 from pathlib import Path
 
 __all__ = ('import_static', 'import_file')
+
+StrPath: TypeAlias = str | PathLike[str]
 
 
 def import_static(name: str, *, package: str | None = None,
@@ -40,7 +43,7 @@ def import_static(name: str, *, package: str | None = None,
     return module
 
 
-def import_file(path: str | PathLike[str], *,
+def import_file(path: StrPath, *,
                 name: str | None = None, reload: bool = False,
                 strict_sys_path: bool = True) -> types.ModuleType:
     """
@@ -84,4 +87,4 @@ def import_file(path: str | PathLike[str], *,
     return module
 
 
-del PathLike
+del StrPath, PathLike

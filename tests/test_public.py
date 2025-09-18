@@ -11,18 +11,32 @@ from utlx import public, private
 class TestPublicPrivate(unittest.TestCase):
 
     def setUp(self):
-        # We create a temporary module for testing
-        self.module = types.ModuleType("testmod")
-        self.module.__dict__["__all__"] = []
+        global __all__
+        __all__ = []
 
     def test_public_decorator_adds_to___all__(self):
         @public
-        def sample(): return 1
+        def sample(): return 1  # pragma: no cover
+        self.assertIn("sample", __all__)
+
+    def test_public_decorator_adds_to___all__repeated(self):
+        @public
+        def sample(): return 1  # pragma: no cover
+        @public
+        def sample(): return 1  # pragma: no cover
         self.assertIn("sample", __all__)
 
     def test_public_function_form_adds_single_name(self):
         result = public(test_func=lambda: 42)
         self.assertEqual(result(), 42)
+        self.assertIn("test_func", __all__)
+        self.assertTrue(callable(test_func))
+
+    def test_public_function_form_adds_single_name_repeated(self):
+        def test_func(): return 64
+        result = public(test_func=test_func)
+        result = public(test_func=test_func)
+        self.assertEqual(result(), 64)
         self.assertIn("test_func", __all__)
         self.assertTrue(callable(test_func))
 
@@ -40,17 +54,21 @@ class TestPublicPrivate(unittest.TestCase):
 
     def test_private_removes_from___all__(self):
         @public
-        def hidden(): return "secret"
+        def hidden(): return "secret"  # pragma: no cover
         self.assertIn("hidden", __all__)
         private(hidden)
         self.assertNotIn("hidden", __all__)
 
-    def XXX_test___all___must_be_list(self):
+    def test___all___must_be_list(self):
+        global __all__
         __all__ = "not a list"
         with self.assertRaises(TypeError):
             public(test=lambda: 1)
+        def ghost(): return "boo"  # pragma: no cover
+        with self.assertRaises(TypeError):
+            private(ghost)
 
     def test_private_does_nothing_if_name_not_in___all__(self):
-        def ghost(): return "boo"
+        def ghost(): return "boo"  # pragma: no cover
         private(ghost)  # Should not raise
         self.assertNotIn("ghost", __all__)

@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 __all__ = ('cached', 'cached_property')
 
-P = TypeVar("P", bound=object)
-T = TypeVar("T")
+_P = TypeVar("_P", bound=object)
+_T = TypeVar("_T")
 
 AnyCallable: TypeAlias = Callable[..., Any]
 
@@ -21,20 +21,21 @@ def cached(method: AnyCallable) -> AnyCallable:
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         key: int = hash(method)
         try:
-            return self.__cache__[key]
-        except KeyError:
-            pass
+            cache = self.__cache__
         except AttributeError:
-            self.__cache__ = {}
-        self.__cache__[key] = result = method(self, *args, **kwargs)
+            cache = self.__cache__ = {}
+        try:
+            result = cache[key]
+        except KeyError:
+            result = cache[key] = method(self, *args, **kwargs)
         return result
 
     return wrapper
 
 
-def cached_property(fget: Callable[[P], T] | None = None,
-                    fset: Callable[[P, T], None] | None = None,
-                    fdel: Callable[[P], None] | None = None,
+def cached_property(fget: Callable[[_P], _T] | None = None,
+                    fset: Callable[[_P, _T], None] | None = None,
+                    fdel: Callable[[_P], None] | None = None,
                     doc: str | None = None) -> property:
     """Decorator to simple cache property attribute.
 
@@ -43,12 +44,48 @@ def cached_property(fget: Callable[[P], T] | None = None,
     fset
       function to be used for setting an attribute value
     fdel
-      function to be used for del'ing an attribute
+      function to be used for deleting an attribute
     doc
       docstring
     """
-    return property(None if fget is None else cached(fget), fset, fdel, doc)
+    from functools import wraps
+
+    _fget, _fset, _fdel = fget, fset, fdel
+    if fget is not None:
+        key: int = hash(fget)
+
+        @wraps(fget)
+        def _fget(self: _P) -> _T:  # noqa: F811
+            try:
+                cache = self.__cache__  # type: ignore[attr-defined]
+            except AttributeError:
+                cache = self.__cache__ = {}  # type: ignore[attr-defined]
+            result: _T
+            try:
+                result = cache[key]
+            except KeyError:
+                result = cache[key] = fget(self)
+            return result
+
+        if fset is not None:
+            @wraps(fset)
+            def _fset(self: _P, value: _T) -> None:  # noqa: F811
+                try:
+                    del self.__cache__[key]  # type: ignore[attr-defined]
+                except (AttributeError, KeyError):
+                    pass
+                fset(self, value)
+
+        if fdel is not None:
+            @wraps(fdel)
+            def _fdel(self: _P) -> None:  # noqa: F811
+                try:
+                    del self.__cache__[key]  # type: ignore[attr-defined]
+                except (AttributeError, KeyError):
+                    pass
+                fdel(self)
+
+    return property(_fget, _fset, _fdel, doc)
 
 
-del P, T
 del TypeVar, TypeAlias, Callable, AnyCallable

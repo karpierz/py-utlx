@@ -1,8 +1,6 @@
 # Copyright (c) 2016 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-from __future__ import annotations
-
 from typing import TypeAlias, Any
 from typing_extensions import Self
 from collections.abc import Callable, Iterable, Generator
@@ -17,15 +15,19 @@ import pathlib
 import hashlib
 import contextlib
 
+import charset_normalizer
+
 __all__ = ('Path',)
 
 StrPath:     TypeAlias = str | PathLike[str]
 AnyCallable: TypeAlias = Callable[..., Any]
 
+_HAS_FILE_ATTRS = hasattr(os.stat_result, "st_file_attributes")
+
 
 class Path(pathlib.Path):
 
-    if sys.version_info[:2] <= (3, 12):
+    if sys.version_info[:2] <= (3, 12):  # pragma: no cover
         """Constructor"""
         def __new__(cls, *args: Any, **kwargs: Any) -> Self:
             cls._flavour = (pathlib.WindowsPath  # type: ignore[union-attr]
@@ -33,19 +35,16 @@ class Path(pathlib.Path):
                             pathlib.PosixPath)._flavour
             return super().__new__(cls, *args, **kwargs)
 
-    if sys.version_info[:2] <= (3, 11):
+    if sys.version_info[:2] <= (3, 11):  # pragma: no cover
         def is_relative_to(self, other: StrPath) -> bool:  # type: ignore[override]
             return super().is_relative_to(other)
 
-    if sys.version_info[:2] <= (3, 11):
-        def relative_to(self, other: StrPath) -> Path:  # type: ignore[override]
+        def relative_to(self, other: StrPath) -> Self:  # type: ignore[override]
             return super().relative_to(other)
 
-    if sys.version_info[:2] <= (3, 9):
+    if sys.version_info[:2] <= (3, 9):  # pragma: no cover
         def hardlink_to(self, target: StrPath) -> None:
-            if not hasattr(os, "link"):
-                raise NotImplementedError("os.link() not available on this system")
-            os.link(target, self)
+            Path(target).link_to(self)
 
     def exists(self) -> bool:
         return super().exists() or self._is_real_link()
@@ -59,7 +58,7 @@ class Path(pathlib.Path):
                               object] | None = None) -> None:
         if not self.exists():
             return
-        shutil.rmtree(str(self), ignore_errors=ignore_errors,
+        shutil.rmtree(self, ignore_errors=ignore_errors,
                       onerror=onexc or self.__remove_readonly)
 
     @staticmethod
@@ -77,36 +76,34 @@ class Path(pathlib.Path):
         if self._is_real_link():
             raise NotADirectoryError("Cannot call cleardir on a symbolic link")
         for entry in self.iterdir():
-            entry = self.__class__(entry)
             if entry.is_dir() and not entry.is_symlink():
                 entry.rmdir(ignore_errors=ignore_errors, onexc=onexc)
             else:
                 entry.unlink(missing_ok=True)
 
-    if hasattr(os.stat_result, "st_file_attributes"):
-        # Special handling for directory junctions to make them behave like
-        # symlinks for shutil.rmtree, since in general they do not appear as
-        # regular links.
-        def _is_real_link(self) -> bool:
+    def _is_real_link(self) -> bool:
+        if _HAS_FILE_ATTRS:
+            # Special handling for directory junctions to make them behave like
+            # symlinks for shutil.rmtree, since in general they do not appear as
+            # regular links.
             try:
-                st = os.lstat(str(self))
+                st = os.lstat(self)
                 return bool(stat.S_ISLNK(st.st_mode)
                             or (st.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
                                 and (not hasattr(os.stat_result, "st_reparse_tag")
                                      or st.st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT)))
             except OSError:
                 return False
-    else:
-        def _is_real_link(self) -> bool:
-            return os.path.islink(str(self))
+        else:
+            return os.path.islink(self)
 
     def copydir(self, dst: StrPath, *, symlinks: bool = False,
                 ignore: Callable[[str, list[str]], Iterable[str]] | None = None,
                 copy_function: Callable[[str, str], object] | None = None,
-                ignore_dangling_symlinks: bool = False) -> Path:
-        return Path(shutil.copytree(str(self), str(dst), symlinks=symlinks, ignore=ignore,
-                                    copy_function=copy_function or shutil.copy2,
-                                    ignore_dangling_symlinks=ignore_dangling_symlinks))
+                ignore_dangling_symlinks: bool = False) -> Self:
+        return type(self)(shutil.copytree(self, dst, symlinks=symlinks, ignore=ignore,
+                                          copy_function=copy_function or shutil.copy2,
+                                          ignore_dangling_symlinks=ignore_dangling_symlinks))
 
     def unlink(self, missing_ok: bool = True) -> None:
         if missing_ok and not self.exists():
@@ -117,24 +114,23 @@ class Path(pathlib.Path):
             self.chmod(stat.S_IWRITE)
             return super().unlink()
 
-    def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Path:
-        return Path(shutil.copy2(str(self), str(dst), follow_symlinks=follow_symlinks))
+    def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Self:
+        return type(self)(shutil.copy2(self, dst, follow_symlinks=follow_symlinks))
 
     def move(self, dst: StrPath, *,
-             copy_function: Callable[[str, str], object] | None = None) -> Path | None:
+             copy_function: Callable[[str, str], object] | None = None) -> Self | None:
         if not self.exists():
             return None
-        return Path(shutil.move(str(self), str(dst),
-                                copy_function=copy_function or shutil.copy2))
+        return type(self)(shutil.move(self, dst, copy_function=copy_function or shutil.copy2))
 
     def copystat(self, dst: StrPath, *, follow_symlinks: bool = True) -> None:
-        return shutil.copystat(str(self), str(dst), follow_symlinks=follow_symlinks)
+        return shutil.copystat(self, dst, follow_symlinks=follow_symlinks)
 
     @classmethod
     def which(cls, cmd: StrPath, *, mode: int = os.F_OK | os.X_OK,
-              path: StrPath | None = None) -> Path | None:
+              path: StrPath | None = None) -> Self | None:
         result = shutil.which(str(cmd), mode=mode, path=path)
-        return Path(result) if result is not None else None
+        return cls(result) if result is not None else None
 
     def file_hash(self, algorithm: str, *, chuck_size: int = 65536) -> Any:
         constructor = self.__hash_algorithms.get(algorithm, lambda: hashlib.new(algorithm))
@@ -176,45 +172,53 @@ class Path(pathlib.Path):
         return shutil.unpack_archive(self, extract_dir, format)
 
     def sed_inplace(self, pattern: str | re.Pattern[str], repl: str, *,
-                    flags: int | re.RegexFlag = 0) -> None:
+                    flags: int | re.RegexFlag = 0, encoding: str | None = None) -> None:
         """Perform the pure-Python equivalent of in-place `sed` substitution: e.g., \
-        `sed -i -e 's/'${pattern}'/'${repl}' "${filename}"`."""
+        `sed -i -e 's/'${pattern}'/'${repl}'/g "${filename}"`."""
+
         # For efficiency, precompile the passed regular expression.
         if not isinstance(pattern, re.Pattern): pattern = re.compile(pattern, flags)
 
-        # For portability, NamedTemporaryFile() defaults to mode "w+b" (i.e., binary
-        # writing with updating). This is usually a good thing. In this case,
-        # however, binary writing imposes non-trivial encoding constraints trivially
-        # resolved by switching to text writing. Let's do that.
-        for encoding in (None, "utf-8", "latin-1", "cp1252", "cp1250", "cp1257", "mbcs"):
-            try:
-                with tempfile.NamedTemporaryFile(mode="wt", newline="", delete=False) as tmp_file:
-                    with self.open(encoding=encoding) as src_file:
-                        if flags & re.MULTILINE:
-                            content = src_file.read()
-                            tmp_file.write(pattern.sub(repl, content))
-                        else:
-                            for line in src_file:
-                                tmp_file.write(pattern.sub(repl, line))
-            except UnicodeError:
-                pass
-            else:
-                # Overwrite the original file with the munged temporary file
-                # in a manner preserving file attributes (e.g., permissions).
-                shutil.copystat(str(self), tmp_file.name)
-                shutil.move(tmp_file.name, str(self))
-                break
+        if encoding is not None:
+            content = self.open("rt", encoding=encoding, newline="").read()
         else:
-            print(str(UnicodeError("can't decode a file '{}'".format(self))))
+            data = self.read_bytes()
+            detected = charset_normalizer.from_bytes(data).best()
+            try:
+                if detected:
+                    encoding = detected.encoding
+                    content  = str(detected)
+                else:
+                    encoding = None
+                    content  = data.decode()
+            except Exception:
+                raise UnicodeError(f"The file '{self}' cannot be decoded. "
+                                   f"It appears to be a binary file.")
+
+        with tempfile.NamedTemporaryFile(mode="wt", encoding=encoding,
+                                         newline="", delete=False) as tmp_file:
+            if flags & re.MULTILINE:
+                tmp_file.write(pattern.sub(repl, content))
+            else:
+                for line in content.splitlines(keepends=True):
+                    tmp_file.write(pattern.sub(repl, line))
+        # Overwrite the original file with the munged temporary file
+        # in a manner preserving file attributes (e.g., permissions).
+        shutil.copystat(self, tmp_file.name)
+        shutil.move(tmp_file.name, self)
 
     def chdir(self) -> None:
-        os.chdir(str(self))
+        os.chdir(self)
 
     @contextlib.contextmanager
     def pushd(self) -> Generator[None, None, None]:
         curr_dir = os.getcwd()
-        os.chdir(str(self))
+        os.chdir(self)
         try:
             yield
         finally:
             os.chdir(curr_dir)
+
+
+del Self, Callable, Iterable, Generator, PathLike
+del StrPath, AnyCallable

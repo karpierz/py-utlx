@@ -9,12 +9,14 @@ from pathlib import Path
 
 import utlx
 from utlx import dll_path, python_dll_path
+from utlx.platform import is_windows, is_pypy
 
 
-@unittest.skipUnless(sys.platform == "win32", "Windows-only tests")
+@unittest.skipUnless(is_windows, "Windows-only tests")
 class TestDllPathWindows(unittest.TestCase):
 
-    def XXX_test_dll_path_for_known_system_dlls(self):
+    @unittest.skip("test_dll_path_for_known_system_dlls: failed!")
+    def test_dll_path_for_known_system_dlls(self):
         # Known DLLs that should be loaded in every Windows session
         dll_names = ["kernel32.dll", "user32.dll"]
         for dll_name in dll_names:
@@ -26,8 +28,6 @@ class TestDllPathWindows(unittest.TestCase):
             self.assertTrue(path.exists(), f"Path for {dll_name} does not exist: {path}")
             self.assertTrue(path.name.lower().endswith(dll_name.lower()))
 
-    @unittest.skipIf(platform.python_implementation() == "PyPy",
-                     "This test is skipped on PyPy")
     def test_python_dll_path(self):
         path = python_dll_path()
         self.assertIsInstance(path, Path)
@@ -40,8 +40,7 @@ class TestDllPathWindows(unittest.TestCase):
         result = dll_path(invalid_handle)
         self.assertIsNone(result)
 
-    @unittest.skipIf(platform.python_implementation() == "PyPy"
-                     and sys.version_info[:2] >= (3, 11),
+    @unittest.skipIf(is_pypy and sys.version_info[:2] >= (3, 11),
                      "This test is skipped on PyPy 3.11+")
     def test_dll_path_with_dynamic_windll_loading(self):
         # Load DLL dynamically using WinDLL

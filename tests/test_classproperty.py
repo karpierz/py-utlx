@@ -66,14 +66,14 @@ class TestClassProperty(unittest.TestCase):
     def test_classproperty_doc_inferred(self):
         def get(cls):
             """Auto-doc"""
-            return "doc"
+            return "doc"  # pragma: no cover
 
         cp = classproperty(get)
         self.assertEqual(cp.__doc__, "Auto-doc")
 
     def test_classproperty_fget_property(self):
         def get(cls):
-            return "value"
+            return "value"  # pragma: no cover
 
         cp = classproperty(get)
         self.assertEqual(cp.fget, get)

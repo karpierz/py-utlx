@@ -11,6 +11,7 @@ from pathlib import Path
 
 import utlx
 from utlx.imports import import_static, import_file
+from utlx.platform import is_pypy
 
 
 class TestImportStatic(unittest.TestCase):
@@ -20,13 +21,11 @@ class TestImportStatic(unittest.TestCase):
         self.assertIsInstance(mod, types.ModuleType)
         self.assertEqual(mod.__name__, "math")
 
-    @unittest.skipIf(platform.python_implementation() == "PyPy",
-                     "This test is skipped on PyPy")
     def test_import_with_reload(self):
-        mod1 = import_static("math")
-        mod2 = import_static("math", reload=True)
+        mod1 = import_static("enum")
+        mod2 = import_static("enum", reload=True)
         self.assertIsInstance(mod2, types.ModuleType)
-        self.assertEqual(mod2.__name__, "math")
+        self.assertEqual(mod2.__name__, "enum")
         self.assertIsNot(mod1, mod2)
 
     def test_import_nonexistent_module(self):
@@ -63,6 +62,12 @@ class TestImportFile(unittest.TestCase):
         mod = import_file(self.module_path, name="custom_name")
         self.assertEqual(mod.__name__, "custom_name")
 
+    def test_import_file_improper(self):
+        module_path = self.temp_dir/"testmod.txt"
+        module_path.write_text("\n")
+        with self.assertRaises(ImportError):
+            import_file(module_path)
+
     def test_import_file_reload(self):
         mod1 = import_file(self.module_path)
         mod2 = import_file(self.module_path, reload=True)
@@ -74,6 +79,10 @@ class TestImportFile(unittest.TestCase):
         try:
             with self.assertRaises(ImportError):
                 import_file(outside_path, strict_sys_path=True)
+            # Default: strict_sys_path == True
+            with self.assertRaises(ImportError):
+                import_file(outside_path)
+            import_file(outside_path, strict_sys_path=False)
         finally:
             outside_path.unlink()
 

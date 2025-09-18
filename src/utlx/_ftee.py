@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-from typing import TextIO
+from typing import TypeAlias, TextIO
 from collections.abc import Generator
 from os import PathLike
 import sys
@@ -9,6 +9,8 @@ import io
 import contextlib
 
 __all__ = ('ftee',)
+
+StrPath: TypeAlias = str | PathLike[str]
 
 
 class _Tee(io.TextIOBase):
@@ -40,7 +42,7 @@ class _Tee(io.TextIOBase):
 
 
 @contextlib.contextmanager
-def ftee(*filenames: str | PathLike[str]) -> Generator[TextIO | _Tee, None, None]:
+def ftee(*filenames: StrPath) -> Generator[TextIO | _Tee, None, None]:
     stdout = sys.stdout
     files = [open(fname, "w") for fname in filenames]
     try:
@@ -51,5 +53,5 @@ def ftee(*filenames: str | PathLike[str]) -> Generator[TextIO | _Tee, None, None
         sys.stdout = stdout
 
 
-del TextIO, Generator, PathLike
+del TextIO, Generator, StrPath, PathLike
 del io, contextlib

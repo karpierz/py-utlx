@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Zlib
 
 import unittest
+import doctest
 
 import utlx
 from utlx import getproperty, setproperty, delproperty
@@ -9,6 +10,12 @@ from utlx import getproperty, setproperty, delproperty
 
 class TestRWProperty(unittest.TestCase):
     """Unit tests for the custom read/write/delete property decorators."""
+
+    def test_doctests(self):
+        result = doctest.testfile("_rwproperty_utlx.txt", package=utlx)
+        if result.failed:  # pragma: no cover
+            doctest.testfile("_rwproperty_utlx.txt", package=utlx,
+                             raise_on_error=True)
 
     def test_get_and_set_property(self):
         """Getter defined first, then setter."""
@@ -66,6 +73,28 @@ class TestRWProperty(unittest.TestCase):
         with self.assertRaises(AttributeError):
             _ = obj.feel
 
+    def test_with_deleter_as_first(self):
+        """Property with getter, setter, and deleter."""
+        class JamesBrown:
+            @delproperty
+            def feel(self):
+                del self._feel
+
+            @setproperty
+            def feel(self, feel):
+                self._feel = feel
+
+            @getproperty
+            def feel(self):
+                return self._feel
+
+        obj = JamesBrown()
+        obj.feel = "good"
+        self.assertEqual(obj.feel, "good")
+        del obj.feel
+        with self.assertRaises(AttributeError):
+            _ = obj.feel
+
     def test_edge_case_non_property_attribute(self):
         """Defining a property on top of a non-property attribute should fail."""
         with self.assertRaises(TypeError):
@@ -74,7 +103,7 @@ class TestRWProperty(unittest.TestCase):
 
                 @getproperty
                 def feel(self):
-                    return "so good"
+                    return "so good"  # pragma: no cover
 
     def test_enhance_property_getter(self):
         """Enhancing an existing property with a getter should only replace fget."""
@@ -124,5 +153,6 @@ class TestRWProperty(unittest.TestCase):
 
         obj = Foo()
         obj.x = 5
+        self.assertEqual(obj.x, 5)
         del obj.x
         self.assertEqual(obj._x, "deleted")

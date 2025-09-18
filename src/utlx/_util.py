@@ -6,7 +6,7 @@ from typing import Any
 from collections.abc import Iterable, Sequence
 try:
     from System import String  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover
+except ImportError:
     String = str
 
 __all__ = ('issubtype', 'isiterable', 'issequence', 'remove_all',
@@ -33,23 +33,13 @@ def remove_all(seq: list[Any], value: Any) -> None:
 
 def print_refinfo(obj: Any) -> None:
     import sys
-
-    def typename(obj: Any) -> Any:
-        try:
-            return obj.__class__.__name__
-        except AttributeError:
-            pass
-        try:
-            return type(obj).__name__
-        except AttributeError:
-            pass
-        return "???"
-
+    type_name = getattr(type(obj), "__name__", getattr(
+                getattr(obj, "__class__", None), "__name__",
+                "???"))
     ref_count = ((sys.getrefcount(obj) - 2)
                  if hasattr(sys, "getrefcount") else None)
-
     print("Object info report",            file=sys.stderr)
-    print("    obj type: ", typename(obj), file=sys.stderr)
+    print("    obj type: ", type_name,     file=sys.stderr)
     print("    obj id:   ", id(obj),       file=sys.stderr)
     if ref_count is not None:
         print("    ref count:", ref_count, file=sys.stderr)

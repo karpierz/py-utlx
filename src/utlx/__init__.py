@@ -23,6 +23,7 @@ from ._unique        import * ; del _unique         # type: ignore[name-defined]
 from ._util          import * ; del _util           # type: ignore[name-defined]
 from .epath          import * ; del epath
 from . import platform
+from . import ctypes
 from . import config
 from . import imports
 from . import epath

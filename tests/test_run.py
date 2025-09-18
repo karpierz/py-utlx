@@ -3,6 +3,7 @@
 
 import unittest
 from unittest import mock
+import io
 import subprocess
 import logging
 
@@ -16,7 +17,8 @@ class TestRunFunction(unittest.TestCase):
         # Capture logs for verification
         self.log_stream = logging.getLogger(_run.__name__)
         self.log_stream.setLevel(logging.DEBUG)
-        self.log_handler = logging.StreamHandler()
+        self.log_buffer = io.StringIO()
+        self.log_handler = logging.StreamHandler(self.log_buffer)
         self.log_stream.addHandler(self.log_handler)
         self.addCleanup(self.log_stream.removeHandler, self.log_handler)
 
@@ -36,7 +38,7 @@ class TestRunFunction(unittest.TestCase):
         mock_run.assert_called_once_with(["cmd"], check=False)
         self.assertIs(result, fake_cp)
 
-    def XXX_test_run_masks_safestring_in_log(self):
+    def test_run_masks_safestring_in_log(self):
         """SafeString arguments should be masked in debug log output."""
         fake_cp = subprocess.CompletedProcess(args=["secret"], returncode=0)
         safe_arg = run.SafeString("secret")
@@ -44,8 +46,8 @@ class TestRunFunction(unittest.TestCase):
             run("echo", safe_arg)
         # Retrieve log output
         self.log_handler.flush()
-        log_output = self.log_handler.stream.getvalue() if hasattr(self.log_handler.stream, "getvalue") else ""
-        self.assertIn("*****", log_output or "")
+        log_output = self.log_buffer.getvalue()
+        self.assertIn("*****", log_output)
 
     def test_run_converts_all_args_to_str(self):
         """Non-string args should be converted to strings before passing to subprocess.run."""

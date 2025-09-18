@@ -32,6 +32,14 @@ class TestDeprecatedDecorator(unittest.TestCase):
         self.assertEqual(sample.__name__, "sample")
         self.assertEqual(sample.__doc__, "This is a sample function")
 
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = sample()
+            self.assertEqual(result, 123)
+            self.assertEqual(len(w), 1)
+            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+            self.assertIn("Call to deprecated function 'sample'", str(w[0].message))
+
     def test_deprecated_with_arguments(self):
         @deprecated
         def add(a, b):
@@ -43,3 +51,4 @@ class TestDeprecatedDecorator(unittest.TestCase):
             self.assertEqual(result, 5)
             self.assertEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+            self.assertIn("Call to deprecated function 'add'", str(w[0].message))
