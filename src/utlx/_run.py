@@ -1,8 +1,8 @@
 # Copyright (c) 2012 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-from typing import Any
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, TypeAlias, Any
+from collections.abc import Iterable
 import subprocess
 import logging
 
@@ -11,46 +11,57 @@ __all__ = ('run',)
 log = logging.getLogger(__name__)
 
 
-def run(*args: Any, start_terminal_window: bool = False,
-        **kwargs: Any) -> subprocess.CompletedProcess[str | bytes]:
-    """
-    Run the command described by args.
+class run:
+    """Unified subprocess interface with namespaced constants and callable execution."""
 
-    Wait for command to complete, then return a subprocess.CompletedProcess instance.
-    :param args: command line arguments which are provided to E-Sys.bat
-    :param start_terminal_window: start command in separate console window (for server mode)
-    :param kwargs: arguments tu control subprocess execution
-    :return: subprocess.CompletedProcess instance
-    """
-    if start_terminal_window:  # pragma: no cover
-        args = ("cmd.exe", "/C", "start", *args)
-    output: subprocess.CompletedProcess[str | bytes] = subprocess.run(
-        [str(arg) for arg in args], check=kwargs.pop("check", True), **kwargs)
-    print_cmd = [("*****" if isinstance(arg, run.SafeString) else arg) for arg in args]
-    log.debug(f"cmd:{print_cmd}, returncode:{output.returncode}")
-    return output
+    if TYPE_CHECKING:
+        CompletedProcess:      TypeAlias = subprocess.CompletedProcess[str | bytes]
+        CompletedTextProcess:  TypeAlias = subprocess.CompletedProcess[str]
+        CompletedBytesProcess: TypeAlias = subprocess.CompletedProcess[bytes]
+    else:
+        CompletedProcess      = subprocess.CompletedProcess
+        CompletedTextProcess  = subprocess.CompletedProcess
+        CompletedBytesProcess = subprocess.CompletedProcess
 
+    PIPE    = subprocess.PIPE
+    STDOUT  = subprocess.STDOUT
+    DEVNULL = subprocess.DEVNULL
 
-run.CompletedProcess = subprocess.CompletedProcess
+    SubprocessError    = subprocess.SubprocessError
+    TimeoutExpired     = subprocess.TimeoutExpired
+    CalledProcessError = subprocess.CalledProcessError
 
-run.PIPE    = subprocess.PIPE
-run.STDOUT  = subprocess.STDOUT
-run.DEVNULL = subprocess.DEVNULL
+    class SafeString(str):
+        """Marks sensitive arguments to be masked in logs."""
 
-run.SubprocessError    = subprocess.SubprocessError
-run.TimeoutExpired     = subprocess.TimeoutExpired
-run.CalledProcessError = subprocess.CalledProcessError
+    def __new__(cls, *args: Any,  # type: ignore[misc]
+                start_terminal_window: bool = False, **kwargs: Any) -> CompletedProcess:
+        """Runs the command described by `args`.
 
-run.SafeString = type("SafeString", (str,), dict())
+        Waits for the command to complete and returns a run.CompletedProcess instance.
 
+        Args:
+            args: Command-line arguments passed to `subprocess.run`.
+            start_terminal_window: If True, starts the command in a separate console
+                                   window (server mode).
+            kwargs: Additional keyword arguments controlling subprocess execution.
 
-def split_kwargs(kwargs: dict[str, Any], forbidden_kwargs: Sequence[str]) \
-        -> tuple[dict[str, Any], dict[str, Any]]:
-    allowed_kwargs  = {key: val for key, val in kwargs.items()
-                       if key not in forbidden_kwargs}
-    reserved_kwargs = {key: val for key, val in kwargs.items()
-                       if key in forbidden_kwargs}
-    return (allowed_kwargs, reserved_kwargs)
+        Returns:
+            run.CompletedProcess: Result of the executed command.
+        """
+        if start_terminal_window:  # pragma: no cover
+            args = ("cmd.exe", "/C", "start", *args)
+        output: run.CompletedProcess = subprocess.run(
+            [str(arg) for arg in args], check=kwargs.pop("check", True), **kwargs)
+        print_cmd = [("*****" if isinstance(arg, cls.SafeString) else arg) for arg in args]
+        log.debug("cmd=%s, returncode=%d", str(print_cmd), int(output.returncode))
+        return output
 
-
-run.split_kwargs = split_kwargs
+    @staticmethod
+    def split_kwargs(kwargs: dict[str, Any], forbidden_kwargs: Iterable[str]) \
+            -> tuple[dict[str, Any], dict[str, Any]]:
+        allowed_kwargs  = {key: val for key, val in kwargs.items()
+                           if key not in forbidden_kwargs}
+        reserved_kwargs = {key: val for key, val in kwargs.items()
+                           if key in forbidden_kwargs}
+        return (allowed_kwargs, reserved_kwargs)

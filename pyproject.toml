@@ -7,7 +7,7 @@ requires = ['setuptools>=80.9.0', 'packaging>=25.0.0', 'tox>=4.30.2']
 
 [project]
 name        = 'py-utlx'
-version     = '1.0.0'
+version     = '1.1.0'
 description = 'Python utilities.'
 authors = [
     { name  = 'Adam Karpierz' },
@@ -246,11 +246,11 @@ env_tmp_dir = '{env:TMP_DIR}{/}tox.env.{env_name}-{env:PYTHONHASHSEED}{/}tmp'
 allowlist_externals = ['cmd', '.clean']
 commands = [
     ['cmd','/C','if','exist','.clean.cmd','.clean.cmd','2>','nul'],
-    ['{env_python}','-W','ignore','-c',"import shutil ; shutil.rmtree('.mypy_cache', ignore_errors=True)"],
     ['{env_python}','-W','ignore','-c',"import shutil ; shutil.rmtree('build', ignore_errors=True)"],
     ['{env_python}','-W','ignore','-c',"import shutil ; shutil.rmtree('dist', ignore_errors=True)"],
     ['{env_python}','-W','ignore','-c',"import shutil,glob ; [shutil.rmtree(item) for item in glob.glob('src/*.egg-info')]"],
     ['{env_python}','-W','ignore','-c',"import shutil,glob ; [shutil.rmtree(item) for item in glob.glob('**/__pycache__', recursive=True)]"],
+    ['{env_python}','-W','ignore','-c',"import shutil,glob ; [shutil.rmtree(item) for item in glob.glob('**/.mypy_cache', recursive=True)]"],
     ['cmd','/C','if','exist','.tox','rmdir','/S/Q','.tox','2>','nul'],
 ]
 extras = []
@@ -323,7 +323,7 @@ commands = [
 extras = []
 deps = [
     {replace='ref',of=['tool','tox','_','base','deps'],extend=true},
-    'mypy>=1.18.1',
+    'mypy>=1.18.2',
     'mypy_extensions>=1.1.0',
     'types-setuptools>=80.9.0.20250822',
 ]
