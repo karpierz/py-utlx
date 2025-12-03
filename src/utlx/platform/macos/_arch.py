@@ -25,3 +25,10 @@ def get_python_arch() -> str | None:
 
 
 arch = get_python_arch()
+
+
+def macos_version() -> tuple[int, ...]:
+    import platform
+    version  = [int(x) for x in platform.mac_ver()[0].split(".")]
+    version += [0] * (3 - len(version))
+    return tuple(version)

@@ -3,6 +3,13 @@
 
 import ctypes as ct
 
+__all__ = (
+    'USHRT_MAX',  'SHRT_MAX',  'SHRT_MIN',
+    'UINT_MAX',   'INT_MAX',   'INT_MIN',
+    'ULONG_MAX',  'LONG_MAX',  'LONG_MIN',
+    'ULLONG_MAX', 'LLONG_MAX', 'LLONG_MIN',
+)
+
 # include <limits.h>
 USHRT_MAX  = ct.c_ushort(-1).value
 SHRT_MAX   = USHRT_MAX >> 1

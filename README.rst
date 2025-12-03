@@ -83,7 +83,7 @@ Authors
 
 .. |package| replace:: py-utlx
 .. |package_bold| replace:: **py-utlx**
-.. |copyright| replace:: Copyright (c) 2004-2025 Adam Karpierz
+.. |copyright| replace:: Copyright (c) 2004-2026 Adam Karpierz
 .. |respository| replace:: https://github.com/karpierz/py-utlx.git
 .. _Development page: https://github.com/karpierz/py-utlx
 .. _PyPI record: https://pypi.org/project/py-utlx/

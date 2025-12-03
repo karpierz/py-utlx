@@ -15,12 +15,12 @@ def dll_path(handle: HMODULE | int) -> Path | None:
     import ctypes as ct
     from ctypes.wintypes import HMODULE, LPWSTR, DWORD
     MAX_PATH = 520
-    GetModuleFileName = ct.windll.kernel32.GetModuleFileNameW
-    GetModuleFileName.argtypes = HMODULE, LPWSTR, DWORD
-    GetModuleFileName.restype  = DWORD
+    GetModuleFileNameW = ct.windll.kernel32.GetModuleFileNameW
+    GetModuleFileNameW.restype  = DWORD
+    GetModuleFileNameW.argtypes = [HMODULE, LPWSTR, DWORD]
     buf = ct.create_unicode_buffer(MAX_PATH)
     # print("LENNNN", len(buf))
-    result = GetModuleFileName(handle, buf, len(buf))
+    result = GetModuleFileNameW(handle, buf, len(buf))
     dll_path = buf.value
     # print("@@@@@@@@@@@", handle, result, dll_path)
     return (Path(dll_path) if handle != 0 and result != 0
