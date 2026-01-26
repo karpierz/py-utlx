@@ -106,13 +106,11 @@ class Path(pathlib.Path):
                                           ignore_dangling_symlinks=ignore_dangling_symlinks))
 
     def unlink(self, missing_ok: bool = True) -> None:
-        if missing_ok and not self.exists():
-            return
         try:
-            return super().unlink()
+            return super().unlink(missing_ok=missing_ok)
         except PermissionError:
             self.chmod(stat.S_IWRITE)
-            return super().unlink()
+            return super().unlink(missing_ok=missing_ok)
 
     def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Self:
         return type(self)(shutil.copy2(self, dst, follow_symlinks=follow_symlinks))

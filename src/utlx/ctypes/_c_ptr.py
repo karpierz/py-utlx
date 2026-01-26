@@ -10,17 +10,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import TypeAlias, SupportsIndex, Any
-import ctypes as ct
+from typing import SupportsIndex, Any
+from ctypes import _Pointer as POINTER  # noqa: N814
+import ctypes
 
 __all__ = ('c_ptr_add', 'c_ptr_sub', 'c_ptr_iadd', 'c_ptr_isub', 'POINTER')
 
-if TYPE_CHECKING:
-    Pointer: TypeAlias = ct._Pointer
 
-
-def c_ptr_add(ptr: Pointer[Any], other: SupportsIndex) -> Pointer[Any]:
+def c_ptr_add(ptr: POINTER[Any], other: SupportsIndex) -> POINTER[Any]:
     """
     Add an integer to a pointer instance.
 
@@ -41,12 +38,12 @@ def c_ptr_add(ptr: Pointer[Any], other: SupportsIndex) -> Pointer[Any]:
         offset = other.__index__()
     except AttributeError:
         raise TypeError("Can only add integer to pointer")
-    void_p = ct.cast(ptr, ct.c_void_p)
-    void_p.value = (void_p.value or 0) + offset  # * ct.sizeof(ptr._type_)
-    return ct.cast(void_p, type(ptr))
+    void_p = ctypes.cast(ptr, ctypes.c_void_p)
+    void_p.value = (void_p.value or 0) + offset  # * ctypes.sizeof(ptr._type_)
+    return ctypes.cast(void_p, type(ptr))
 
 
-def c_ptr_sub(ptr: Pointer[Any], other: Pointer[Any] | SupportsIndex) -> Pointer[Any] | int:
+def c_ptr_sub(ptr: POINTER[Any], other: POINTER[Any] | SupportsIndex) -> POINTER[Any] | int:
     """
     Substract an integer or a pointer from a pointer.
 
@@ -74,22 +71,23 @@ def c_ptr_sub(ptr: Pointer[Any], other: Pointer[Any] | SupportsIndex) -> Pointer
     0
     >>>
     """
-    if isinstance(other, (ct._Pointer, ct.c_void_p, ct.c_char_p, ct.c_wchar_p)):
+    if isinstance(other, (POINTER, ctypes.c_void_p,
+                          ctypes.c_char_p, ctypes.c_wchar_p)):
         if type(ptr) is not type(other):
             raise TypeError("Both pointers must be of the same type")
-        return ((ct.cast(ptr,   ct.c_void_p).value or 0) -  # noqa: W504
-                (ct.cast(other, ct.c_void_p).value or 0))
+        return ((ctypes.cast(ptr,   ctypes.c_void_p).value or 0) -  # noqa: W504
+                (ctypes.cast(other, ctypes.c_void_p).value or 0))
     else:
         try:
             offset = other.__index__()
         except AttributeError:
             raise TypeError("Can only substract pointer or integer from pointer")
-        void_p = ct.cast(ptr, ct.c_void_p)
-        void_p.value = (void_p.value or 0) - offset  # * ct.sizeof(ptr._type_)
-        return ct.cast(void_p, type(ptr))
+        void_p = ctypes.cast(ptr, ctypes.c_void_p)
+        void_p.value = (void_p.value or 0) - offset  # * ctypes.sizeof(ptr._type_)
+        return ctypes.cast(void_p, type(ptr))
 
 
-def c_ptr_iadd(ptr: Pointer[Any], other: SupportsIndex) -> None:
+def c_ptr_iadd(ptr: POINTER[Any], other: SupportsIndex) -> None:
     """
     Add an integer to a pointer instance in place:
 
@@ -106,11 +104,12 @@ def c_ptr_iadd(ptr: Pointer[Any], other: SupportsIndex) -> None:
         offset = other.__index__()
     except AttributeError:
         raise TypeError("Can only add integer to pointer")
-    void_p = ct.cast(ct.pointer(ptr), ct.POINTER(ct.c_void_p)).contents
-    void_p.value = (void_p.value or 0) + offset  # * ct.sizeof(ptr._type_)
+    void_p = ctypes.cast(ctypes.pointer(ptr),
+                         ctypes.POINTER(ctypes.c_void_p)).contents
+    void_p.value = (void_p.value or 0) + offset  # * ctypes.sizeof(ptr._type_)
 
 
-def c_ptr_isub(ptr: Pointer[Any], other: SupportsIndex) -> None:
+def c_ptr_isub(ptr: POINTER[Any], other: SupportsIndex) -> None:
     """
     Substract an integer or a pointer from a pointer.
 
@@ -138,16 +137,12 @@ def c_ptr_isub(ptr: Pointer[Any], other: SupportsIndex) -> None:
         offset = other.__index__()
     except AttributeError:
         raise TypeError("Can only substract integer from pointer")
-    void_p = ct.cast(ct.pointer(ptr), ct.POINTER(ct.c_void_p)).contents
-    void_p.value = (void_p.value or 0) - offset  # * ct.sizeof(ptr._type_)
+    void_p = ctypes.cast(ctypes.pointer(ptr),
+                         ctypes.POINTER(ctypes.c_void_p)).contents
+    void_p.value = (void_p.value or 0) - offset  # * ctypes.sizeof(ptr._type_)
 
 
-if TYPE_CHECKING:
-    POINTER: TypeAlias = Pointer
-    del Pointer
-else:
-    POINTER = ct.POINTER
-del TypeAlias, SupportsIndex, Any
+del SupportsIndex, Any
 
 
 if __name__ == "__main__":

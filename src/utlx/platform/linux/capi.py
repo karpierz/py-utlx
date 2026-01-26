@@ -8,12 +8,20 @@ from __future__ import annotations
 import ctypes as ct
 from ctypes import CDLL as DLL
 try:
-    from _ctypes import dlclose  # type: ignore[attr-defined]
+    from _ctypes import dlclose  # type: ignore[attr-defined,unused-ignore]
 except ImportError:  # pragma: no cover
     dlclose = lambda handle: None
 from ctypes import CFUNCTYPE as CFUNC
 
-from ...ctypes import POINTER
+from ... import ctypes as ctx
+
+__all__ = (
+    'DLL', 'dlclose', 'CFUNC',
+    'time_t', 'suseconds_t', 'timeval',
+    'SOCKET', 'INVALID_SOCKET', 'socklen_t', 'sa_family_t', 'in_addr_t', 'in_port_t',
+    'sockaddr', 'in_addr', 'sockaddr_in', 'in6_addr', 'sockaddr_in6',
+    'FD_SETSIZE', 'fd_set', 'FD_ZERO', 'FD_ISSET', 'FD_SET', 'FD_CLR', 'select',
+)
 
 # X32 kernel interface is 64-bit.
 if False:  # if defined __x86_64__ && defined __ILP32__
@@ -59,25 +67,29 @@ class sockaddr(ct.Structure):
     ("__pad2",    ct.c_ulong),
 ]
 
+# https://yarchive.net/comp/linux/socklen_t.html
+socklen_t = ct.c_uint32 if ct.sizeof(ct.c_uint) < 4 else ct.c_uint
+
 # POSIX.1g specifies this type name for the `sa_family' member.
 sa_family_t = ct.c_ushort
 
-# Type to represent a port.
+# Types to represent an address and port.
+in_addr_t = ct.c_uint32
 in_port_t = ct.c_uint16
 
 # IPv4 AF_INET sockets:
 
 class in_addr(ct.Structure):
     _fields_ = [
-    ("s_addr", ct.c_uint32),
+    ("s_addr", in_addr_t),
 ]
 
 class sockaddr_in(ct.Structure):
     _fields_ = [
-    ("sin_family", sa_family_t),  # e.g. AF_INET, AF_INET6
-    ("sin_port",   in_port_t),    # Port number.
-    ("sin_addr",   in_addr),      # Internet address.
-    ("sin_zero",   (ct.c_ubyte    # Pad to size of `struct sockaddr'.
+    ("sin_family", sa_family_t),      # e.g. AF_INET, AF_INET6
+    ("sin_port",   in_port_t),        # Port number.
+    ("sin_addr",   in_addr),          # Internet address.
+    ("sin_zero",   (ct.c_ubyte        # Pad to size of `struct sockaddr'.
                     * (ct.sizeof(sockaddr)
                        - ct.sizeof(sa_family_t)
                        - ct.sizeof(in_port_t)
@@ -95,46 +107,46 @@ class in6_addr(ct.Union):
 
 class sockaddr_in6(ct.Structure):
     _fields_ = [
-    ("sin6_family",   sa_family_t),  # address family, AF_INET6
-    ("sin6_port",     in_port_t),    # Transport layer port #
-    ("sin6_flowinfo", ct.c_uint32),  # IPv6 flow information
-    ("sin6_addr",     in6_addr),     # IPv6 address
-    ("sin6_scope_id", ct.c_uint32),  # IPv6 scope-id
+    ("sin6_family",   sa_family_t),   # address family, AF_INET6
+    ("sin6_port",     in_port_t),     # Transport layer port #
+    ("sin6_flowinfo", ct.c_uint32),   # IPv6 flow information
+    ("sin6_addr",     in6_addr),      # IPv6 address
+    ("sin6_scope_id", ct.c_uint32),   # IPv6 scope-id
 ]
 
 # From <sys/select.h>
 
 # The fd_set member
-fd_mask = ct.c_long
-NFDBITS = 8 * ct.sizeof(fd_mask)
+_fd_mask = ct.c_long  # fd_mask and NFDBITS are not portable, cannot be exported.
+_NFDBITS = 8 * ct.sizeof(_fd_mask)
 
 # Maximum number of file descriptors in `fd_set'.
 FD_SETSIZE = 1024
 
 class fd_set(ct.Structure):
     _fields_ = [
-    ("fds_bits", (fd_mask * (FD_SETSIZE // NFDBITS))),
+    ("fds_bits", (_fd_mask * (FD_SETSIZE // _NFDBITS))),
 ]
 
-def FD_ZERO(fdsetp: POINTER[fd_set]) -> None:
+def FD_ZERO(fdsetp: ctx.POINTER[fd_set]) -> None:
     import ctypes as ct
     fdset = fdsetp.contents
     ct.memset(fdsetp, 0, ct.sizeof(fdset))
 FD_ZERO = CFUNC(None, ct.POINTER(fd_set))(FD_ZERO)
 
-def FD_ISSET(fd: int, fdsetp: POINTER[fd_set]) -> int:
+def FD_ISSET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> int:
     fdset = fdsetp.contents
-    return int(fdset.fds_bits[fd // NFDBITS] & (1 << (fd % NFDBITS)))
+    return int(fdset.fds_bits[fd // _NFDBITS] & (1 << (fd % _NFDBITS)))
 FD_ISSET = CFUNC(ct.c_int, ct.c_int, ct.POINTER(fd_set))(FD_ISSET)
 
-def FD_SET(fd: int, fdsetp: POINTER[fd_set]) -> None:
+def FD_SET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
-    fdset.fds_bits[fd // NFDBITS] |= (1 << (fd % NFDBITS))
+    fdset.fds_bits[fd // _NFDBITS] |= (1 << (fd % _NFDBITS))
 FD_SET = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_SET)
 
-def FD_CLR(fd: int, fdsetp: POINTER[fd_set]) -> None:
+def FD_CLR(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
-    fdset.fds_bits[fd // NFDBITS] &= ~(1 << (fd % NFDBITS))
+    fdset.fds_bits[fd // _NFDBITS] &= ~(1 << (fd % _NFDBITS))
 FD_CLR = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_CLR)
 
 libc = ct.CDLL("libc.so.6")
@@ -145,4 +157,4 @@ select.argtypes = [ct.c_int,
                    ct.POINTER(fd_set), ct.POINTER(fd_set), ct.POINTER(fd_set),
                    ct.POINTER(timeval)]
 
-del ct, POINTER, libc
+del ct, ctx, libc

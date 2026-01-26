@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Zlib
 
 import typing
-from typing import TypeVar, TypeAlias, Generic, Any
+from typing import TypeVar, Generic, Any
 from typing_extensions import Self
 from collections.abc import Callable
 
@@ -48,4 +48,4 @@ class classproperty(Generic[_C, _T]):
         return self
 
 
-del TypeVar, TypeAlias, Generic, Self, Callable
+del TypeVar, Generic, Self, Callable
