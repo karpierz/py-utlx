@@ -5,6 +5,12 @@ import sys
 import os
 import platform
 
+__all__ = (
+    'is_windows', 'is_wsl', 'is_cygwin', 'is_msys', 'is_linux', 'is_macos',
+    'is_bsd', 'is_sunos', 'is_aix', 'is_android', 'is_posix', 'is_32bits',
+    'is_ucs2', 'is_cpython', 'is_pypy', 'is_ironpython',
+)
+
 is_windows = (bool(platform.win32_ver()[0])
               or (sys.platform in ("win32", "cygwin", "msys"))
               or (sys.platform == "cli" and os.name in ("nt", "ce"))

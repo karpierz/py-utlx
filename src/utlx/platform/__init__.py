@@ -7,8 +7,10 @@ from ._detect import *
 from ._oid    import *
 from . import _limits as limits
 if is_windows:  # pragma: no cover
-    from .windows import *  # type: ignore[no-redef, unused-ignore]
+    from .windows import arch as _arch
 elif is_linux:  # pragma: no cover
-    from .linux import *    # type: ignore[no-redef, unused-ignore]
+    from .linux import arch as _arch
 elif is_macos:  # pragma: no cover
-    from .macos import *    # type: ignore[no-redef, unused-ignore]
+    from .macos import arch as _arch
+from . import capi
+arch = _arch

@@ -100,19 +100,19 @@ class Path(pathlib.Path):
     def copydir(self, dst: StrPath, *, symlinks: bool = False,
                 ignore: Callable[[str, list[str]], Iterable[str]] | None = None,
                 copy_function: Callable[[str, str], object] | None = None,
-                ignore_dangling_symlinks: bool = False) -> Self:
+                ignore_dangling_symlinks: bool = False,
+                dirs_exist_ok: bool = False) -> Self:
         return type(self)(shutil.copytree(self, dst, symlinks=symlinks, ignore=ignore,
                                           copy_function=copy_function or shutil.copy2,
-                                          ignore_dangling_symlinks=ignore_dangling_symlinks))
+                                          ignore_dangling_symlinks=ignore_dangling_symlinks,
+                                          dirs_exist_ok=dirs_exist_ok))
 
     def unlink(self, missing_ok: bool = True) -> None:
-        if missing_ok and not self.exists():
-            return
         try:
-            return super().unlink()
+            return super().unlink(missing_ok=missing_ok)
         except PermissionError:
             self.chmod(stat.S_IWRITE)
-            return super().unlink()
+            return super().unlink(missing_ok=missing_ok)
 
     def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Self:
         return type(self)(shutil.copy2(self, dst, follow_symlinks=follow_symlinks))

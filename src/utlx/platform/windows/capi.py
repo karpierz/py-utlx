@@ -14,7 +14,15 @@ except ImportError:  # pragma: no cover
 from ctypes import WINFUNCTYPE as CFUNC
 from ctypes import windll
 
-from ...ctypes import POINTER
+from ... import ctypes as ctx
+
+__all__ = (
+    'DLL', 'dlclose', 'CFUNC',
+    'time_t', 'suseconds_t', 'timeval',
+    'SOCKET', 'INVALID_SOCKET', 'socklen_t', 'sa_family_t', 'in_addr_t', 'in_port_t',
+    'sockaddr', 'in_addr', 'sockaddr_in', 'in6_addr', 'sockaddr_in6',
+    'FD_SETSIZE', 'fd_set', 'FD_ZERO', 'FD_ISSET', 'FD_SET', 'FD_CLR', 'select',
+)
 
 time_t = ct.c_uint64
 
@@ -47,8 +55,7 @@ SOCKET = ct.c_uint
 # In Winsock, the error return if socket() fails is INVALID_SOCKET.
 INVALID_SOCKET = SOCKET(-1).value
 
-# Winsock doesn't have this UN*X type; it's used in the UN*X
-# sockets API.
+# Winsock doesn't have this UN*X type; it's used in the UN*X sockets API.
 socklen_t = ct.c_int
 
 class sockaddr(ct.Structure):
@@ -63,14 +70,15 @@ class sockaddr(ct.Structure):
 # POSIX.1g specifies this type name for the `sa_family' member.
 sa_family_t = ct.c_short
 
-# Type to represent a port.
+# Types to represent an address and port.
+in_addr_t = ct.c_uint32  # ct.c_ulong
 in_port_t = ct.c_ushort
 
 # IPv4 AF_INET sockets:
 
-class in_addr(ct.Union):
+class in_addr(ct.Structure):
     _fields_ = [
-    ("s_addr", ct.c_uint32),  # ct.c_ulong
+    ("s_addr", in_addr_t),
 ]
 
 class sockaddr_in(ct.Structure):
@@ -92,11 +100,11 @@ class in6_addr(ct.Union):
 
 class sockaddr_in6(ct.Structure):
     _fields_ = [
-    ("sin6_family",   sa_family_t),  # address family, AF_INET6
-    ("sin6_port",     in_port_t),    # port number, Network Byte Order
-    ("sin6_flowinfo", ct.c_ulong),   # IPv6 flow information
-    ("sin6_addr",     in6_addr),     # IPv6 address
-    ("sin6_scope_id", ct.c_ulong),   # Scope ID
+    ("sin6_family",   sa_family_t),   # address family, AF_INET6
+    ("sin6_port",     in_port_t),     # port number, Network Byte Order
+    ("sin6_flowinfo", ct.c_ulong),    # IPv6 flow information
+    ("sin6_addr",     in6_addr),      # IPv6 address
+    ("sin6_scope_id", ct.c_ulong),    # Scope ID
 ]
 
 # From <sys/select.h>
@@ -110,13 +118,13 @@ class fd_set(ct.Structure):
     ("fd_array", (SOCKET * FD_SETSIZE)),
 ]
 
-def FD_ZERO(fdsetp: POINTER[fd_set]) -> None:
+def FD_ZERO(fdsetp: ctx.POINTER[fd_set]) -> None:
     import ctypes as ct
     fdset = fdsetp.contents
     ct.memset(fdsetp, 0, ct.sizeof(fdset))
 FD_ZERO = CFUNC(None, ct.POINTER(fd_set))(FD_ZERO)
 
-def FD_ISSET(fd: int, fdsetp: POINTER[fd_set]) -> int:
+def FD_ISSET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> int:
     fdset = fdsetp.contents
     for i in range(fdset.fd_count):
         if fdset.fd_array[i] == fd:
@@ -124,7 +132,7 @@ def FD_ISSET(fd: int, fdsetp: POINTER[fd_set]) -> int:
     return 0
 FD_ISSET = CFUNC(ct.c_int, ct.c_int, ct.POINTER(fd_set))(FD_ISSET)
 
-def FD_SET(fd: int, fdsetp: POINTER[fd_set]) -> None:
+def FD_SET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
     if fdset.fd_count < FD_SETSIZE:
         fdset.fd_array[fdset.fd_count] = fd
@@ -132,7 +140,7 @@ def FD_SET(fd: int, fdsetp: POINTER[fd_set]) -> None:
     else: pass  # pragma: no cover
 FD_SET = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_SET)
 
-def FD_CLR(fd: int, fdsetp: POINTER[fd_set]) -> None:
+def FD_CLR(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
     for i in range(fdset.fd_count):
         if fdset.fd_array[i] == fd:
@@ -149,4 +157,4 @@ select.argtypes = [ct.c_int,
                    ct.POINTER(fd_set), ct.POINTER(fd_set), ct.POINTER(fd_set),
                    ct.POINTER(timeval)]
 
-del ct, POINTER, windll
+del ct, ctx, windll

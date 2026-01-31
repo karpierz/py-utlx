@@ -1,11 +1,11 @@
 # Copyright (c) 2016 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-__all__ = ('make_config',)
-
 from typing  import Any
 from pathlib import Path
 import configparser
+
+__all__ = ('make_config',)
 
 
 def make_config(cfg_fname: str, cfg_section: str | None = None) -> None:
