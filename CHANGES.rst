@@ -1,6 +1,15 @@
 Changelog
 =========
 
+2.4.0 (2026-05-20)
+------------------
+- Full support for Python 3.15
+- Dropped support for Python 3.10 (due to compatibility issues).
+- Added utlx.platform.is_graalpy().
+- Switch from using charset_normalizer to chardet.
+- Fix for nox 'lint' session.
+- Setup update, fixes and improvement.
+
 2.3.0 (2026-03-30)
 ------------------
 - Setup update and improvement.
@@ -12,12 +21,12 @@ Changelog
 
 2.1.2 (2026-01-30)
 ------------------
-- utlx.epath.Path.copydir() - added dirs_exist_ok parameter
-- utlx.platform.*.capi  - added in_addr_t
-- utlx.platform.windows - added winapi
-- utlx.platform.macos   - added macos_version()
+- utlx.epath.Path.copydir() - added dirs_exist_ok parameter.
+- utlx.platform.*.capi  - added in_addr_t.
+- utlx.platform.windows - added winapi.
+- utlx.platform.macos   - added macos_version().
 - utlx.platform.windows.winapi - added OpenProcessToken(),
-  GetTokenInformation()
+  GetTokenInformation().
 - run(): cleanup and improvements.
 - Much better typing.
 - Some minor cleanup and unifications.

@@ -15,7 +15,7 @@ import pathlib
 import hashlib
 import contextlib
 
-import charset_normalizer
+import chardet
 
 __all__ = ('Path',)
 
@@ -39,12 +39,9 @@ class Path(pathlib.Path):
         def is_relative_to(self, other: StrPath) -> bool:  # type: ignore[override]
             return super().is_relative_to(other)
 
+    if sys.version_info[:2] <= (3, 11):  # pragma: no cover
         def relative_to(self, other: StrPath) -> Self:  # type: ignore[override]
             return super().relative_to(other)
-
-    if sys.version_info[:2] <= (3, 9):  # pragma: no cover
-        def hardlink_to(self, target: StrPath) -> None:
-            Path(target).link_to(self)
 
     def exists(self) -> bool:
         return super().exists() or self._is_real_link()
@@ -114,14 +111,18 @@ class Path(pathlib.Path):
             self.chmod(stat.S_IWRITE)
             return super().unlink(missing_ok=missing_ok)
 
-    def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Self:
-        return type(self)(shutil.copy2(self, dst, follow_symlinks=follow_symlinks))
+    if sys.version_info[:2] <= (3, 13):
+        def copy(self, target: StrPath, *, follow_symlinks: bool = True) -> Self:
+            return type(self)(shutil.copy2(self, target, follow_symlinks=follow_symlinks))
+    else: pass  # pragma: no cover
 
-    def move(self, dst: StrPath, *,
-             copy_function: Callable[[str, str], object] | None = None) -> Self | None:
+    def move(self, target: StrPath) -> Self | None:
         if not self.exists():
             return None
-        return type(self)(shutil.move(self, dst, copy_function=copy_function or shutil.copy2))
+        if sys.version_info[:2] <= (3, 13):
+            return type(self)(shutil.move(self, target, copy_function=shutil.copy2))
+        else:  # pragma: no cover
+            return super().move(target)
 
     def copystat(self, dst: StrPath, *, follow_symlinks: bool = True) -> None:
         return shutil.copystat(self, dst, follow_symlinks=follow_symlinks)
@@ -183,14 +184,10 @@ class Path(pathlib.Path):
             content = self.open("rt", encoding=encoding, newline="").read()
         else:
             data = self.read_bytes()
-            detected = charset_normalizer.from_bytes(data).best()
+            detected = chardet.detect(data, prefer_superset=False, compat_names=False)
+            encoding = detected["encoding"]
             try:
-                if detected:
-                    encoding = detected.encoding
-                    content  = str(detected)
-                else:
-                    encoding = None
-                    content  = data.decode()
+                content = data.decode(encoding) if encoding else data.decode()
             except Exception:
                 raise UnicodeError(f"The file '{self}' cannot be decoded. "
                                    f"It appears to be a binary file.")

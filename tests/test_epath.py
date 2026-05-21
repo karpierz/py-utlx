@@ -290,14 +290,14 @@ class TestPath(unittest.TestCase):
             # We make sure the timestamps differ before copying
             src_stat = os.stat(src)
             dst_stat = os.stat(dst)
-            self.assertNotEqual(src_stat.st_mtime, dst_stat.st_mtime)
+            self.assertNotEqual(src_stat.st_mtime_ns, dst_stat.st_mtime_ns)
 
             # We copy the metadata
             src.copystat(dst)
 
             # We check whether the mtime was successfully copied
             dst_stat_after = os.stat(dst)
-            self.assertEqual(src_stat.st_mtime, dst_stat_after.st_mtime)
+            self.assertEqual(src_stat.st_mtime_ns, dst_stat_after.st_mtime_ns)
 
     def test_copystat_symlink_behavior(self):
         with tempfile.NamedTemporaryFile() as src_file, \
@@ -365,21 +365,24 @@ class TestSedInPlace(unittest.TestCase):
         self.assertIn("Hello Universe", content)
 
     def test_sed_inplace_detected_encoding(self):
-        fake_detected = mock.Mock()
-        fake_detected.encoding = "utf-8"
-        fake_detected.__str__ = lambda self: "Hi World\nHi Python\n"
-        with mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = fake_detected
+        fake_detected = {}
+        fake_detected["encoding"] = "utf-8"
+        with mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             self.file.sed_inplace("Hello", "Hi")
         content = self.file.read_text()
         self.assertIn("Hi World", content)
+        self.assertIn("Hi Python", content)
 
     def test_sed_inplace_no_detected_encoding(self):
-        with mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = None
+        fake_detected = {}
+        fake_detected["encoding"] = None
+        with mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             self.file.sed_inplace("Hello", "Hi")
         content = self.file.read_text()
         self.assertIn("Hi World", content)
+        self.assertIn("Hi Python", content)
 
     def test_sed_inplace_multiline_flag(self):
         self.file.sed_inplace("^Hello", "Hi", flags=re.MULTILINE, encoding="utf-8")
@@ -395,8 +398,10 @@ class TestSedInPlace(unittest.TestCase):
         bad_file = self.temp_dir / "bad.txt"
 
         # Patch read_bytes to return our BadBytes instance
+        fake_detected = {}
+        fake_detected["encoding"] = None
         with mock.patch.object(type(bad_file), "read_bytes", return_value=BadBytes(b"xxx")), \
-             mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = None
+             mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             with self.assertRaises(UnicodeError):
                 bad_file.sed_inplace("x", "y")

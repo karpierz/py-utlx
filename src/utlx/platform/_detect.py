@@ -30,6 +30,7 @@ is_32bits  = (sys.maxsize <= 2**32)
 is_ucs2    = (sys.maxunicode < 0x10FFFF)
 is_cpython = (platform.python_implementation().lower() == "cpython")
 is_pypy    = (platform.python_implementation().lower() == "pypy")
+is_graalpy = (platform.python_implementation().lower() == "graalvm")
 is_ironpython = (platform.python_implementation().lower() == "ironpython"
                  or "cli" in (platform.system().lower(), sys.platform))
 

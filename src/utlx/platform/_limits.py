@@ -3,6 +3,8 @@
 
 import ctypes
 
+from ._detect import is_graalpy
+
 __all__ = (
     'USHRT_MAX',  'SHRT_MAX',  'SHRT_MIN',
     'UINT_MAX',   'INT_MAX',   'INT_MIN',
@@ -20,8 +22,11 @@ INT_MIN    = -INT_MAX - 1
 ULONG_MAX  = ctypes.c_ulong(-1).value
 LONG_MAX   = ULONG_MAX >> 1
 LONG_MIN   = -LONG_MAX - 1
-ULLONG_MAX = ctypes.c_ulonglong(-1).value
+ULLONG_MAX = (((ULONG_MAX << ((ctypes.sizeof(ctypes.c_ulonglong)
+                               - ctypes.sizeof(ctypes.c_ulong)) * 8)) + ULONG_MAX)
+              if is_graalpy else
+              ctypes.c_ulonglong(-1).value)
 LLONG_MAX  = ULLONG_MAX >> 1
 LLONG_MIN  = -LLONG_MAX - 1
 
-del ctypes
+del ctypes, is_graalpy
