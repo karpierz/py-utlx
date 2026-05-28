@@ -32,7 +32,7 @@ class TestPath(unittest.TestCase):
         new_dir.mkdir()
         self.assertTrue(new_dir.exists())
 
-    def test_rmdir_and_cleardir(self):
+    def test_rmtree_and_cleardir(self):
         subdir = self.temp_dir / "sub"
         subdir.mkdir()
         (subdir / "file.txt").write_text("data")
@@ -53,7 +53,7 @@ class TestPath(unittest.TestCase):
         (subdir / "sub_sub" / "file.txt").write_text("data_sub")
         (subdir / "sub_sub" / "file_readonly.txt").write_text("data_sub_readonly")
         (subdir / "sub_sub" / "file_readonly.txt").chmod(stat.S_IREAD)
-        subdir.rmdir()
+        subdir.rmtree()
         self.assertFalse(subdir.exists())
 
         subdir = self.temp_dir / "nonexistent.txt"
@@ -65,12 +65,12 @@ class TestPath(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             subdir.cleardir()
 
-    def test_rmdir_on_nonexistent_path_does_nothing(self):
+    def test_rmtree_on_nonexistent_path_does_nothing(self):
         ghost = self.temp_dir / "ghost"
         try:
-            ghost.rmdir()
+            ghost.rmtree()
         except Exception as e:  # pragma: no cover
-            self.fail(f"rmdir raised {e} unexpectedly")
+            self.fail(f"rmtree raised {e} unexpectedly")
 
     def test_cleardir_on_symlink_raises(self):
         target = self.temp_dir / "target"
@@ -99,6 +99,7 @@ class TestPath(unittest.TestCase):
         dst = self.temp_dir / "dst_basic"
 
         copied = src.copydir(dst)
+
         self.assertTrue((copied / "file1.txt").exists())
         self.assertTrue((copied / "file2.txt").exists())
         self.assertEqual((copied / "file1.txt").read_text(), "Hello")
@@ -110,6 +111,7 @@ class TestPath(unittest.TestCase):
         dst = self.temp_dir / "dst_empty"
 
         copied = src.copydir(dst)
+
         self.assertTrue(copied.exists())
         self.assertTrue(copied.is_dir())
         self.assertEqual(list(copied.iterdir()), [])
@@ -120,6 +122,7 @@ class TestPath(unittest.TestCase):
         dst = self.temp_dir / "dst_nested"
 
         copied = src.copydir(dst)
+
         self.assertTrue((copied / "a" / "b" / "c").exists())
         self.assertTrue((copied / "a" / "b" / "c").is_dir())
         self.assertEqual(list((copied / "a" / "b" / "c").iterdir()), [])
@@ -135,6 +138,7 @@ class TestPath(unittest.TestCase):
             return ["file2.txt"]
 
         copied = src.copydir(dst, ignore=ignore_func)
+
         self.assertTrue(copied.exists())
         self.assertTrue((copied / "file1.txt").exists())
         self.assertFalse((copied / "file2.txt").exists())
@@ -150,6 +154,7 @@ class TestPath(unittest.TestCase):
             return files  # ignore all
 
         copied = src.copydir(dst, ignore=ignore_all)
+
         self.assertTrue(copied.exists())
         self.assertEqual(list(copied.iterdir()), [])
 
@@ -164,6 +169,7 @@ class TestPath(unittest.TestCase):
 
         copied = src.copydir(dst, symlinks=True)
         copied_link = copied / "link.txt"
+
         self.assertTrue(copied_link.is_symlink())
         self.assertEqual(copied_link.read_text(), "symlinked")
 
@@ -180,6 +186,7 @@ class TestPath(unittest.TestCase):
 
         copied = src.copydir(dst, copy_function=custom_copy)
         content = (copied / "file.txt").read_text()
+
         self.assertIn("original", content)
         self.assertIn("[copied]", content)
 
@@ -188,12 +195,228 @@ class TestPath(unittest.TestCase):
         copied = self.file.copy(dst)
         self.assertTrue(dst.exists())
         self.assertEqual(dst.read_text(), "Hello World\nHello Python\n")
-
         moved_path = self.temp_dir / "moved.txt"
+
         moved = copied.move(moved_path)
+
         self.assertTrue(moved_path.exists())
         self.assertFalse(dst.exists())
         self.assertEqual(moved.read_text(), "Hello World\nHello Python\n")
+
+    def test_copy_file_basic(self):
+        src = self.temp_dir / "src.txt"
+        src.write_text("data")
+        dst = self.temp_dir / "dst.txt"
+
+        copied = src.copy(dst)
+
+        self.assertTrue(dst.exists())
+        self.assertEqual(dst.read_text(), "data")
+        self.assertIsInstance(copied, Path)
+
+    def test_copy_directory(self):
+        src_dir = self.temp_dir / "srcdir"
+        src_dir.mkdir()
+        (src_dir / "f.txt").write_text("abc")
+        dst_dir = self.temp_dir / "dst"
+
+        copied = src_dir.copy(dst_dir)
+
+        self.assertTrue((dst_dir / "f.txt").exists())
+        self.assertEqual((dst_dir / "f.txt").read_text(), "abc")
+        self.assertIsInstance(copied, Path)
+
+    def test_copy_with_str_target(self):
+        src = self.temp_dir / "src_str"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+        dst = str(self.temp_dir / "dst_str")
+
+        copied = src.copy(dst)
+        expected = Path(dst)
+
+        self.assertEqual(copied, expected)
+        self.assertTrue((expected / "file.txt").exists())
+        self.assertTrue(src.exists())
+
+    def test_copy_symlink_follow_true(self):
+        target = self.temp_dir / "target.txt"
+        target.write_text("xyz")
+        link = self.temp_dir / "link.txt"
+        link.symlink_to(target)
+        dst = self.temp_dir / "dst.txt"
+
+        copied = link.copy(dst, follow_symlinks=True)
+
+        self.assertTrue(dst.exists())
+        self.assertEqual(dst.read_text(), "xyz")
+
+    def test_copy_symlink_follow_false(self):
+        target = self.temp_dir / "target.txt"
+        target.write_text("xyz")
+        link = self.temp_dir / "link.txt"
+        link.symlink_to(target)
+        dst = self.temp_dir / "dst_link.txt"
+
+        link.copy(dst, follow_symlinks=False)
+
+        self.assertTrue(dst.is_symlink())
+        self.assertTrue(dst.readlink().samefile(target))
+
+    def test_copy_preserve_metadata_flag(self):
+        dst = self.temp_dir / "dst.txt"
+        src = self.temp_dir / "src.txt"
+        src.write_text("data")
+
+        copied = src.copy(dst, preserve_metadata=True)
+
+        self.assertTrue(dst.exists())
+        # Metadata copy is implicit in copy2/copytree, so just check timestamps
+        self.assertAlmostEqual(dst.stat().st_mtime, src.stat().st_mtime, delta=1.0)
+
+    def test_copy_symlink_dir(self):
+        dir_target = self.temp_dir / "dir_target"
+        dir_target.mkdir()
+        link = self.temp_dir / "dir_link"
+        link.symlink_to(dir_target, target_is_directory=True)
+        dst = self.temp_dir / "dst_link"
+
+        link.copy(dst, follow_symlinks=False)
+
+        self.assertTrue(dst.is_symlink())
+        self.assertTrue(dst.readlink().samefile(dir_target))
+
+    def test_copy_into_basic(self):
+        src = self.temp_dir / "src_copy_into"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+        target_dir = self.temp_dir / "target_copy_into"
+        target_dir.mkdir()
+
+        copied = src.copy_into(target_dir)
+
+        self.assertTrue((target_dir / "src_copy_into" / "file.txt").exists())
+        self.assertTrue(src.exists())  # copy, not move
+        self.assertEqual((target_dir / "src_copy_into" / "file.txt").read_text(), "data")
+
+    def test_copy_into_with_str_target(self):
+        src = self.temp_dir / "src_str"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+        dst = str(self.temp_dir / "dst_str")
+        Path(dst).mkdir()
+
+        copied = src.copy_into(dst)
+        expected = Path(dst) / "src_str"
+
+        self.assertEqual(copied, expected)
+        self.assertTrue((expected / "file.txt").exists())
+        self.assertTrue(src.exists())
+
+    def test_copy_into_symlink_behavior(self):
+        src = self.temp_dir / "src_symlink"
+        src.mkdir()
+
+        target = src / "target.txt"
+        target.write_text("symlinked")
+
+        link = src / "link.txt"
+        link.symlink_to(target)
+
+        dst = self.temp_dir / "dst_symlink"
+        dst.mkdir()
+
+        copied = src.copy_into(dst, follow_symlinks=False)
+        copied_link = copied / "link.txt"
+
+        self.assertTrue(copied_link.is_symlink())
+        self.assertEqual(copied_link.read_text(), "symlinked")
+
+    def test_copy_into_preserve_metadata(self):
+        src = self.temp_dir / "src_meta"
+        src.write_text("data")
+
+        # ustawiamy mtime
+        new_mtime = time.time() - 5000
+        os.utime(src, (new_mtime, new_mtime))
+
+        dst_dir = self.temp_dir / "dst_meta"
+        dst_dir.mkdir()
+
+        copied = src.copy_into(dst_dir, preserve_metadata=True)
+        src_stat = os.stat(src)
+        copied_stat = os.stat(copied)
+
+        self.assertEqual(src_stat.st_mtime_ns, copied_stat.st_mtime_ns)
+
+    def test_copy_into_empty_directory(self):
+        src = self.temp_dir / "src_empty"
+        src.mkdir()
+        dst = self.temp_dir / "dst_empty"
+        dst.mkdir()
+
+        copied = src.copy_into(dst)
+
+        self.assertTrue(copied.exists())
+        self.assertTrue(copied.is_dir())
+        self.assertEqual(list(copied.iterdir()), [])
+
+    def test_copy_into_empty_name_raises(self):
+        nameless = Path("")  # name == ""
+        with self.assertRaises(ValueError):
+            nameless.copy_into(self.temp_dir)
+
+    def test_copy_into_nonexistent_target_dir(self):
+        src = self.temp_dir / "src_nonexistent"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+
+        dst = self.temp_dir / "no_such_dir"
+
+        with self.assertRaises(FileNotFoundError):
+            src.copy_into(dst)
+
+    def test_copy_into_existent_target_file(self):
+        src = self.temp_dir / "src_copy_into"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+
+        dst = self.temp_dir / "dst_copy_into"
+        dst.mkdir()
+        dst_file = dst / "file.txt"
+        dst_file.write_text("data")
+
+        with self.assertRaises(FileNotFoundError):
+            src.copy_into(dst_file)
+
+    def test_move_into_basic(self):
+        src = self.temp_dir / "src_move_into"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+
+        target_dir = self.temp_dir / "target_move_into"
+        target_dir.mkdir()
+
+        moved = src.move_into(target_dir)
+
+        self.assertTrue((target_dir / "src_move_into" / "file.txt").exists())
+        self.assertFalse(src.exists())
+        self.assertEqual((target_dir / "src_move_into" / "file.txt").read_text(), "data")
+
+    def test_move_into_with_str_target(self):
+        src = self.temp_dir / "src_str"
+        src.mkdir()
+        (src / "file.txt").write_text("data")
+
+        dst = str(self.temp_dir / "dst_str")
+        Path(dst).mkdir()
+
+        moved = src.move_into(dst)
+        expected = Path(dst) / "src_str"
+
+        self.assertEqual(moved, expected)
+        self.assertTrue((expected / "file.txt").exists())
+        self.assertFalse(src.exists())
 
     def test_move_nonexistent(self):
         src = self.temp_dir / "nonexistent.txt"
@@ -201,9 +424,14 @@ class TestPath(unittest.TestCase):
 
         moved_path = self.temp_dir / "nonexistent_moved.txt"
         self.assertFalse(moved_path.exists())
-        moved = src.move(moved_path)
-        self.assertIsNone(moved)
+        with self.assertRaises(FileNotFoundError):
+            src.move(moved_path)
         self.assertFalse(moved_path.exists())
+
+    def test_move_into_empty_name_raises(self):
+        nameless = Path("")  # name == ""
+        with self.assertRaises(ValueError):
+            nameless.move_into(self.temp_dir)
 
     def test_unlink_and_permission_handling(self):
         self.file.chmod(stat.S_IREAD)
@@ -290,14 +518,14 @@ class TestPath(unittest.TestCase):
             # We make sure the timestamps differ before copying
             src_stat = os.stat(src)
             dst_stat = os.stat(dst)
-            self.assertNotEqual(src_stat.st_mtime, dst_stat.st_mtime)
+            self.assertNotEqual(src_stat.st_mtime_ns, dst_stat.st_mtime_ns)
 
             # We copy the metadata
             src.copystat(dst)
 
             # We check whether the mtime was successfully copied
             dst_stat_after = os.stat(dst)
-            self.assertEqual(src_stat.st_mtime, dst_stat_after.st_mtime)
+            self.assertEqual(src_stat.st_mtime_ns, dst_stat_after.st_mtime_ns)
 
     def test_copystat_symlink_behavior(self):
         with tempfile.NamedTemporaryFile() as src_file, \
@@ -365,21 +593,24 @@ class TestSedInPlace(unittest.TestCase):
         self.assertIn("Hello Universe", content)
 
     def test_sed_inplace_detected_encoding(self):
-        fake_detected = mock.Mock()
-        fake_detected.encoding = "utf-8"
-        fake_detected.__str__ = lambda self: "Hi World\nHi Python\n"
-        with mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = fake_detected
+        fake_detected = {}
+        fake_detected["encoding"] = "utf-8"
+        with mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             self.file.sed_inplace("Hello", "Hi")
         content = self.file.read_text()
         self.assertIn("Hi World", content)
+        self.assertIn("Hi Python", content)
 
     def test_sed_inplace_no_detected_encoding(self):
-        with mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = None
+        fake_detected = {}
+        fake_detected["encoding"] = None
+        with mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             self.file.sed_inplace("Hello", "Hi")
         content = self.file.read_text()
         self.assertIn("Hi World", content)
+        self.assertIn("Hi Python", content)
 
     def test_sed_inplace_multiline_flag(self):
         self.file.sed_inplace("^Hello", "Hi", flags=re.MULTILINE, encoding="utf-8")
@@ -395,8 +626,10 @@ class TestSedInPlace(unittest.TestCase):
         bad_file = self.temp_dir / "bad.txt"
 
         # Patch read_bytes to return our BadBytes instance
+        fake_detected = {}
+        fake_detected["encoding"] = None
         with mock.patch.object(type(bad_file), "read_bytes", return_value=BadBytes(b"xxx")), \
-             mock.patch("utlx.epath.charset_normalizer.from_bytes") as mock_from_bytes:
-            mock_from_bytes.return_value.best.return_value = None
+             mock.patch("utlx.epath.chardet.detect") as mock_detect:
+            mock_detect.return_value = fake_detected
             with self.assertRaises(UnicodeError):
                 bad_file.sed_inplace("x", "y")

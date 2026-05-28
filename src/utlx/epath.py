@@ -15,17 +15,24 @@ import pathlib
 import hashlib
 import contextlib
 
-import charset_normalizer
+import chardet
 
-__all__ = ('Path',)
+__all__ = ('Path', 'UnsupportedOperation')
 
 StrPath:     TypeAlias = str | PathLike[str]
 AnyCallable: TypeAlias = Callable[..., Any]
 
 _HAS_FILE_ATTRS = hasattr(os.stat_result, "st_file_attributes")
 
+if sys.version_info[:2] <= (3, 12):  # pragma: no cover
+    UnsupportedOperation = NotImplementedError
+else:
+    from pathlib import UnsupportedOperation
+
 
 class Path(pathlib.Path):
+
+    __slots__ = ()
 
     if sys.version_info[:2] <= (3, 12):  # pragma: no cover
         """Constructor"""
@@ -36,15 +43,12 @@ class Path(pathlib.Path):
             return super().__new__(cls, *args, **kwargs)
 
     if sys.version_info[:2] <= (3, 11):  # pragma: no cover
+
         def is_relative_to(self, other: StrPath) -> bool:  # type: ignore[override]
             return super().is_relative_to(other)
 
         def relative_to(self, other: StrPath) -> Self:  # type: ignore[override]
             return super().relative_to(other)
-
-    if sys.version_info[:2] <= (3, 9):  # pragma: no cover
-        def hardlink_to(self, target: StrPath) -> None:
-            Path(target).link_to(self)
 
     def exists(self) -> bool:
         return super().exists() or self._is_real_link()
@@ -53,33 +57,34 @@ class Path(pathlib.Path):
               parents: bool = False, exist_ok: bool = True) -> None:
         return super().mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
 
-    def rmdir(self, *, ignore_errors: bool = False,
-              onexc: Callable[[AnyCallable, str, Any],
-                              object] | None = None) -> None:
+    def rmtree(self, *, ignore_errors: bool = False,
+               on_error: Callable[[AnyCallable, str, Any], object] | None = None,
+               onerror:  Callable[[AnyCallable, str, Any], object] | None = None) -> None:
         if not self.exists():
             return
         shutil.rmtree(self, ignore_errors=ignore_errors,
-                      onerror=onexc or self.__remove_readonly)
+                      onerror=on_error or onerror or self.__remove_readonly)
 
     @staticmethod
     def __remove_readonly(func: AnyCallable, path: str, excinfo: Any) -> None:
         os.chmod(path, stat.S_IWRITE)
         func(path)
 
-    def cleardir(self, *, ignore_errors: bool = False,
-                 onexc: Callable[[AnyCallable, str, Any],
-                                 object] | None = None) -> None:
+    def cleartree(self, *, ignore_errors: bool = False,
+                 on_error: Callable[[AnyCallable, str, Any], object] | None = None) -> None:
         if not self.exists():
             return
         if not self.is_dir():
             raise NotADirectoryError(f"The directory name is invalid: '{self}'")
         if self._is_real_link():
-            raise NotADirectoryError("Cannot call cleardir on a symbolic link")
+            raise NotADirectoryError("Cannot call cleartree on a symbolic link")
         for entry in self.iterdir():
             if entry.is_dir() and not entry.is_symlink():
-                entry.rmdir(ignore_errors=ignore_errors, onexc=onexc)
+                entry.rmtree(ignore_errors=ignore_errors, on_error=on_error)
             else:
                 entry.unlink(missing_ok=True)
+
+    cleardir = cleartree  # Deprecated - only for backward compatibility
 
     def _is_real_link(self) -> bool:
         if _HAS_FILE_ATTRS:
@@ -97,15 +102,17 @@ class Path(pathlib.Path):
         else:
             return os.path.islink(self)
 
-    def copydir(self, dst: StrPath, *, symlinks: bool = False,
-                ignore: Callable[[str, list[str]], Iterable[str]] | None = None,
-                copy_function: Callable[[str, str], object] | None = None,
-                ignore_dangling_symlinks: bool = False,
-                dirs_exist_ok: bool = False) -> Self:
-        return type(self)(shutil.copytree(self, dst, symlinks=symlinks, ignore=ignore,
+    def copytree(self, target: StrPath, *, symlinks: bool = False,
+                 ignore: Callable[[str, list[str]], Iterable[str]] | None = None,
+                 copy_function: Callable[[str, str], object] | None = None,
+                 ignore_dangling_symlinks: bool = False,
+                 dirs_exist_ok: bool = False) -> Self:
+        return type(self)(shutil.copytree(self, target, symlinks=symlinks, ignore=ignore,
                                           copy_function=copy_function or shutil.copy2,
                                           ignore_dangling_symlinks=ignore_dangling_symlinks,
                                           dirs_exist_ok=dirs_exist_ok))
+
+    copydir = copytree  # Deprecated - only for backward compatibility
 
     def unlink(self, missing_ok: bool = True) -> None:
         try:
@@ -114,17 +121,82 @@ class Path(pathlib.Path):
             self.chmod(stat.S_IWRITE)
             return super().unlink(missing_ok=missing_ok)
 
-    def copy(self, dst: StrPath, *, follow_symlinks: bool = True) -> Self:
-        return type(self)(shutil.copy2(self, dst, follow_symlinks=follow_symlinks))
+    if sys.version_info[:2] <= (3, 13):
 
-    def move(self, dst: StrPath, *,
-             copy_function: Callable[[str, str], object] | None = None) -> Self | None:
-        if not self.exists():
-            return None
-        return type(self)(shutil.move(self, dst, copy_function=copy_function or shutil.copy2))
+        def copy(self, target: StrPath, *,
+                 follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self:
+            """Recursively copy this file or directory tree to the given destination."""
+            if not hasattr(target, "with_segments"):
+                target = self.with_segments(target)
+            assert isinstance(target, type(self))
+            if self.is_dir():
+                if not follow_symlinks and self.is_symlink():
+                    self._copy_symlink(target, preserve_metadata)
+                else:
+                    self.copytree(target,
+                                  symlinks=not follow_symlinks,
+                                  ignore_dangling_symlinks=False,
+                                  dirs_exist_ok=False)
+            else:
+                type(self)(shutil.copy2(self, target, follow_symlinks=follow_symlinks))
+            # No action needed for preserve_metadata. copytree and copy2 always copies metadata
+            # if preserve_metadata or os.name == "nt":
+            #     shutil.copystat(self, copied, follow_symlinks=follow_symlinks)
+            return target.joinpath()  # Empty join to ensure fresh metadata.
 
-    def copystat(self, dst: StrPath, *, follow_symlinks: bool = True) -> None:
-        return shutil.copystat(self, dst, follow_symlinks=follow_symlinks)
+        def _copy_symlink(self, target: StrPath, preserve_metadata: bool = False) -> None:
+            # If a directory-symlink is copied *before* its target, then
+            # os.symlink() incorrectly creates a file-symlink on Windows. Avoid
+            # this by passing *target_is_dir* to os.symlink() on Windows.
+            os.symlink(self.readlink(), target, self.is_dir())
+            # if preserve_metadata:
+            #     _copy_info(self.info, target, follow_symlinks=False)
+
+        def copy_into(self, target_dir: StrPath, *,
+                      follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self:
+            """Copy this file or directory tree into the given existing directory."""
+            name = self.name
+            if not name:
+                raise ValueError(f"{self!r} has an empty name")
+            elif hasattr(target_dir, "with_segments"):
+                target = target_dir / name  # type: ignore[operator]
+            else:
+                target = self.with_segments(target_dir, name)
+            if not target.parent.exists():
+                raise FileNotFoundError("The system cannot find the path specified: "
+                                        f"'{target_dir}'")
+            return self.copy(target,
+                             follow_symlinks=follow_symlinks,
+                             preserve_metadata=preserve_metadata)
+
+        def move(self, target: StrPath) -> Self:
+            return type(self)(shutil.move(self, target, copy_function=shutil.copy2))
+
+        def move_into(self, target_dir: StrPath) -> Self:
+            """Move this file or directory tree into the given existing directory."""
+            name = self.name
+            if not name:
+                raise ValueError(f"{self!r} has an empty name")
+            elif hasattr(target_dir, "with_segments"):
+                target = target_dir / name  # type: ignore[operator]
+            else:
+                target = self.with_segments(target_dir, name)
+            return self.move(target)
+
+        if sys.version_info[:2] <= (3, 11):  # pragma: no cover
+
+            def with_segments(self, *pathsegments: Any) -> Self:
+                """Construct a new path object from any number of path-like objects.
+
+                Subclasses may override this method to customize how new path objects
+                are created from methods like `iterdir()`.
+                """
+                return type(self)(*pathsegments)
+
+    else: pass  # pragma: no cover
+
+    def copystat(self, target: StrPath, *, follow_symlinks: bool = True) -> None:
+        return shutil.copystat(self, target, follow_symlinks=follow_symlinks)
 
     @classmethod
     def which(cls, cmd: StrPath, *, mode: int = os.F_OK | os.X_OK,
@@ -183,14 +255,10 @@ class Path(pathlib.Path):
             content = self.open("rt", encoding=encoding, newline="").read()
         else:
             data = self.read_bytes()
-            detected = charset_normalizer.from_bytes(data).best()
+            detected = chardet.detect(data, prefer_superset=False, compat_names=False)
+            encoding = detected["encoding"]
             try:
-                if detected:
-                    encoding = detected.encoding
-                    content  = str(detected)
-                else:
-                    encoding = None
-                    content  = data.decode()
+                content = data.decode(encoding) if encoding else data.decode()
             except Exception:
                 raise UnicodeError(f"The file '{self}' cannot be decoded. "
                                    f"It appears to be a binary file.")

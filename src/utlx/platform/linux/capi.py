@@ -23,6 +23,8 @@ __all__ = (
     'FD_SETSIZE', 'fd_set', 'FD_ZERO', 'FD_ISSET', 'FD_SET', 'FD_CLR', 'select',
 )
 
+# Types
+
 # X32 kernel interface is 64-bit.
 if False:  # if defined __x86_64__ && defined __ILP32__
     # quad_t is also 64 bits.

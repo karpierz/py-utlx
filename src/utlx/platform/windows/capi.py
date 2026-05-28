@@ -24,6 +24,8 @@ __all__ = (
     'FD_SETSIZE', 'fd_set', 'FD_ZERO', 'FD_ISSET', 'FD_SET', 'FD_CLR', 'select',
 )
 
+# Types
+
 time_t = ct.c_uint64
 
 # Winsock doesn't have this POSIX type; it's used for the
