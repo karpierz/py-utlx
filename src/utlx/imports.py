@@ -1,14 +1,16 @@
 # Copyright (c) 2012 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-from typing import TypeAlias
+from typing import TypeAlias, Generator
 from os import PathLike
 import sys
 import types
+import contextlib
+import threading
 import importlib.util
 from pathlib import Path
 
-__all__ = ('import_static', 'import_file')
+__all__ = ('import_static', 'import_file', 'import_absolute')
 
 StrPath: TypeAlias = str | PathLike[str]
 
@@ -62,13 +64,23 @@ def import_file(path: StrPath, *,
         ImportError: If the file does not exist, cannot be loaded,
                      or is outside sys.path when strict_sys_path is True.
     """
-    path = Path(path).resolve()
+    try:
+        path = Path(path).resolve()
+    except Exception as exc:
+        raise ImportError(f"Cannot resolve module path: {path}") from exc
     if not path.exists():
         raise ImportError(f"No module named '{path.stem}'")
 
     if strict_sys_path:
-        if not any(path.is_relative_to(Path(p).resolve())
-                   for p in sys.path if p):
+        for p in sys.path:
+            if not p:
+                continue
+            try:
+                if path.is_relative_to(Path(p).resolve()):
+                    break
+            except Exception:
+                continue
+        else:
             raise ImportError(f"Module path '{path}' is not within sys.path")
 
     if name is None:  name = path.stem
@@ -85,6 +97,46 @@ def import_file(path: StrPath, *,
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+_sys_path_lock = threading.RLock()
+
+@contextlib.contextmanager
+def import_absolute() -> Generator[None, None, None]:
+    """
+    Context manager that temporarily enforces absolute imports by removing \
+    all sys.path entries that refer to the current working directory (CWD).
+
+    This prevents accidental shadowing of standard-library or installed
+    modules by local files located in the project directory. The function
+    uses Path.samefile() to detect entries that resolve to the CWD and
+    safely ignores invalid or non-path entries in sys.path.
+
+    The original sys.path list is restored after the context exits. The
+    operation is thread-safe and does not replace the sys.path object,
+    only its contents.
+
+    Yields:
+        None: The context in which absolute imports are enforced.
+    """
+    with _sys_path_lock:
+        cwd = Path.cwd().resolve()
+        org_sys_path = sys.path.copy()
+        try:
+            for path in org_sys_path:
+                try:
+                    the_same_as_cwd = cwd.samefile(path)
+                except Exception:  # pragma: no cover
+                    continue
+                if the_same_as_cwd:
+                    try:
+                        sys.path.remove(path)
+                    except ValueError:  # pragma: no cover
+                        pass
+                else: pass  # pragma: no cover
+            yield
+        finally:
+            sys.path[:] = org_sys_path
 
 
 del StrPath, PathLike

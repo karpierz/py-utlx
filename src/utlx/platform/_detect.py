@@ -8,7 +8,7 @@ import platform
 __all__ = (
     'is_windows', 'is_wsl', 'is_cygwin', 'is_msys', 'is_linux', 'is_macos',
     'is_bsd', 'is_sunos', 'is_aix', 'is_android', 'is_posix', 'is_32bits',
-    'is_ucs2', 'is_cpython', 'is_pypy', 'is_ironpython',
+    'is_ucs2', 'is_cpython', 'is_pypy', 'is_graalpy', 'is_ironpython',
 )
 
 is_windows = (bool(platform.win32_ver()[0])
@@ -30,6 +30,7 @@ is_32bits  = (sys.maxsize <= 2**32)
 is_ucs2    = (sys.maxunicode < 0x10FFFF)
 is_cpython = (platform.python_implementation().lower() == "cpython")
 is_pypy    = (platform.python_implementation().lower() == "pypy")
+is_graalpy = (platform.python_implementation().lower() == "graalvm")
 is_ironpython = (platform.python_implementation().lower() == "ironpython"
                  or "cli" in (platform.system().lower(), sys.platform))
 

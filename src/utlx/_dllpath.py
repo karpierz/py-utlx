@@ -19,7 +19,6 @@ def dll_path(handle: HMODULE | int) -> Path | None:
     GetModuleFileNameW.restype  = DWORD
     GetModuleFileNameW.argtypes = [HMODULE, LPWSTR, DWORD]
     buf = ctypes.create_unicode_buffer(MAX_PATH)
-    # print("LENNNN", len(buf))
     result = GetModuleFileNameW(handle, buf, len(buf))
     dll_path = buf.value
     # print("@@@@@@@@@@@", handle, result, dll_path)

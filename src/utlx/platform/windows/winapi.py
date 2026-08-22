@@ -11,13 +11,14 @@ from ctypes.wintypes import (
     CHAR, WCHAR, BOOLEAN, BOOL, BYTE, WORD, DWORD, SHORT, USHORT, INT,
     UINT, LONG, ULONG, LARGE_INTEGER, ULARGE_INTEGER, FLOAT, DOUBLE,
     LPBYTE, PBYTE, LPWORD, PWORD, LPDWORD, PDWORD, LPLONG, PLONG, LPSTR,
-    LPWSTR, LPCSTR, LPVOID, LPCVOID, LPVOID as PVOID, HANDLE, LPHANDLE,
-    PHANDLE, HMODULE, HLOCAL, WPARAM, LPARAM, FILETIME, LPFILETIME,
+    LPWSTR, LPCSTR, LPCWSTR, LPVOID, LPCVOID, LPVOID as PVOID, HANDLE,
+    LPHANDLE, PHANDLE, HMODULE, HLOCAL, WPARAM, LPARAM, FILETIME, LPFILETIME,
 )
 
 from ctypes.wintypes import WPARAM as ULONG_PTR  # workaround
 PULONG_PTR = ctypes.POINTER(ULONG_PTR)
 
+UCHAR     = ctypes.c_ubyte
 ULONG32   = ctypes.c_uint32
 ULONGLONG = ctypes.c_uint64
 DWORDLONG = ctypes.c_uint64
@@ -88,7 +89,8 @@ GetTokenInformation.argtypes = [HANDLE,  # TokenHandle
 
 GetExitCodeProcess = windll.kernel32.GetExitCodeProcess
 GetExitCodeProcess.restype  = BOOL
-GetExitCodeProcess.argtypes = [HANDLE, LPDWORD]
+GetExitCodeProcess.argtypes = [HANDLE,
+                               LPDWORD]
 
 ExitProcess = windll.kernel32.ExitProcess
 ExitProcess.restype  = None
@@ -142,6 +144,93 @@ Sleep = windll.kernel32.Sleep
 Sleep.restype  = None
 Sleep.argtypes = [DWORD]
 
+FILE_ATTRIBUTE_READONLY              = 0x00000001
+FILE_ATTRIBUTE_HIDDEN                = 0x00000002
+FILE_ATTRIBUTE_SYSTEM                = 0x00000004
+FILE_ATTRIBUTE_DIRECTORY             = 0x00000010
+FILE_ATTRIBUTE_ARCHIVE               = 0x00000020
+FILE_ATTRIBUTE_DEVICE                = 0x00000040
+FILE_ATTRIBUTE_NORMAL                = 0x00000080
+FILE_ATTRIBUTE_TEMPORARY             = 0x00000100
+FILE_ATTRIBUTE_SPARSE_FILE           = 0x00000200
+FILE_ATTRIBUTE_REPARSE_POINT         = 0x00000400
+FILE_ATTRIBUTE_COMPRESSED            = 0x00000800
+FILE_ATTRIBUTE_OFFLINE               = 0x00001000
+FILE_ATTRIBUTE_NOT_CONTENT_INDEXED   = 0x00002000
+FILE_ATTRIBUTE_ENCRYPTED             = 0x00004000
+FILE_ATTRIBUTE_INTEGRITY_STREAM      = 0x00008000
+FILE_ATTRIBUTE_VIRTUAL               = 0x00010000
+FILE_ATTRIBUTE_NO_SCRUB_DATA         = 0x00020000
+FILE_ATTRIBUTE_EA                    = 0x00040000
+FILE_ATTRIBUTE_PINNED                = 0x00080000
+FILE_ATTRIBUTE_UNPINNED              = 0x00100000
+FILE_ATTRIBUTE_RECALL_ON_OPEN        = 0x00040000
+FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000
+
+GetFileAttributesW = windll.kernel32.GetFileAttributesW
+GetFileAttributesW.restype  = DWORD
+GetFileAttributesW.argtypes = [LPCWSTR]
+
+FILE_FLAG_BACKUP_SEMANTICS   = 0x02000000
+FILE_FLAG_DELETE_ON_CLOSE    = 0x04000000
+FILE_FLAG_NO_BUFFERING       = 0x20000000
+FILE_FLAG_OPEN_NO_RECALL     = 0x00100000
+FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+FILE_FLAG_OVERLAPPED         = 0x40000000
+FILE_FLAG_POSIX_SEMANTICS    = 0x01000000
+FILE_FLAG_RANDOM_ACCESS      = 0x10000000
+FILE_FLAG_SESSION_AWARE      = 0x00800000
+FILE_FLAG_SEQUENTIAL_SCAN    = 0x08000000
+FILE_FLAG_WRITE_THROUGH      = 0x80000000
+
+CREATE_NEW        = 1
+CREATE_ALWAYS     = 2
+OPEN_EXISTING     = 3
+OPEN_ALWAYS       = 4
+TRUNCATE_EXISTING = 5
+
+CreateFileW = windll.kernel32.CreateFileW
+CreateFileW.restype  = HANDLE
+CreateFileW.argtypes = [LPCWSTR,
+                        DWORD,
+                        DWORD,
+                        LPSECURITY_ATTRIBUTES,
+                        DWORD,
+                        DWORD,
+                        HANDLE]
+
+class OVERLAPPED(ctypes.Structure):
+    class _DummyUnion(ctypes.Union):
+        class _DummyStruct(ctypes.Structure):
+            _fields_ = [
+            ("Offset",     DWORD),
+            ("OffsetHigh", DWORD),
+        ]
+        # _anonymous_ = ("_",)  # disabled for GraalPy compatibility
+        _fields_ = [
+        ("_",        _DummyStruct),
+        ("Pointer",  PVOID),
+    ]
+    # _anonymous_ = ("_",)  # disabled for GraalPy compatibility
+    _fields_ = [
+    ("Internal",     ULONG_PTR),
+    ("InternalHigh", ULONG_PTR),
+    ("_",            _DummyUnion),
+    ("hEvent",       HANDLE),
+]
+LPOVERLAPPED = ctypes.POINTER(OVERLAPPED)
+
+DeviceIoControl = windll.kernel32.DeviceIoControl
+DeviceIoControl.restype  = BOOL
+DeviceIoControl.argtypes = [HANDLE,
+                            DWORD,
+                            LPVOID,
+                            DWORD,
+                            LPVOID,
+                            DWORD,
+                            LPDWORD,
+                            LPOVERLAPPED]
+
 GetStdHandle = windll.kernel32.GetStdHandle
 GetStdHandle.restype  = HANDLE
 GetStdHandle.argtypes = [DWORD]
@@ -178,6 +267,16 @@ FormatMessageA.argtypes = [DWORD,
                            DWORD,
                            DWORD,
                            LPSTR,
+                           DWORD,
+                           LPVOID]
+
+FormatMessageW = windll.kernel32.FormatMessageW
+FormatMessageW.restype  = DWORD
+FormatMessageW.argtypes = [DWORD,
+                           LPCVOID,
+                           DWORD,
+                           DWORD,
+                           LPWSTR,
                            DWORD,
                            LPVOID]
 
@@ -282,3 +381,48 @@ LocalFree.argtypes = [HLOCAL]
 MAKEWORD = lambda blow, bhigh: (bhigh << 8) + blow
 
 del ctypes
+
+# print("__all__ =", tuple(name for name in globals() if not name.startswith("_")))
+__all__ = (
+    'windll', 'wintypes', 'WINFUNCTYPE', 'CHAR', 'WCHAR', 'BOOLEAN', 'BOOL',
+    'BYTE', 'WORD', 'DWORD', 'SHORT', 'USHORT', 'INT', 'UINT', 'LONG', 'ULONG',
+    'LARGE_INTEGER', 'ULARGE_INTEGER', 'FLOAT', 'DOUBLE', 'LPBYTE', 'PBYTE',
+    'LPWORD', 'PWORD', 'LPDWORD', 'PDWORD', 'LPLONG', 'PLONG', 'LPSTR',
+    'LPWSTR', 'LPCSTR', 'LPCWSTR', 'LPVOID', 'LPCVOID', 'PVOID', 'HANDLE',
+    'LPHANDLE', 'PHANDLE', 'HMODULE', 'HLOCAL', 'WPARAM', 'LPARAM', 'FILETIME',
+    'LPFILETIME', 'ULONG_PTR', 'PULONG_PTR', 'UCHAR', 'ULONG32', 'ULONGLONG',
+    'DWORDLONG', 'SIZE_T', 'WAIT_ABANDONED', 'WAIT_OBJECT_0', 'WAIT_TIMEOUT',
+    'WAIT_FAILED', 'IGNORE', 'INFINITE', 'FORMAT_MESSAGE_ALLOCATE_BUFFER',
+    'FORMAT_MESSAGE_ARGUMENT_ARRAY', 'FORMAT_MESSAGE_FROM_HMODULE',
+    'FORMAT_MESSAGE_FROM_STRING', 'FORMAT_MESSAGE_FROM_SYSTEM',
+    'FORMAT_MESSAGE_IGNORE_INSERTS', 'FORMAT_MESSAGE_MAX_WIDTH_MASK',
+    'GetActiveProcessorCount', 'GetModuleFileNameW', 'GetProcessId',
+    'GetCurrentProcess', 'GetCurrentProcessId', 'GetProcessTimes',
+    'OpenProcessToken', 'TOKEN_INFORMATION_CLASS', 'PTOKEN_INFORMATION_CLASS',
+    'GetTokenInformation', 'GetExitCodeProcess', 'ExitProcess',
+    'SECURITY_ATTRIBUTES', 'LPSECURITY_ATTRIBUTES', 'LPTHREAD_START_ROUTINE',
+    'CreateThread', 'GetCurrentThreadId', 'WaitForSingleObject', 'SetEvent',
+    'CreateSemaphore', 'ReleaseSemaphore', 'Sleep', 'FILE_ATTRIBUTE_READONLY',
+    'FILE_ATTRIBUTE_HIDDEN', 'FILE_ATTRIBUTE_SYSTEM', 'FILE_ATTRIBUTE_DIRECTORY',
+    'FILE_ATTRIBUTE_ARCHIVE', 'FILE_ATTRIBUTE_DEVICE', 'FILE_ATTRIBUTE_NORMAL',
+    'FILE_ATTRIBUTE_TEMPORARY', 'FILE_ATTRIBUTE_SPARSE_FILE',
+    'FILE_ATTRIBUTE_REPARSE_POINT', 'FILE_ATTRIBUTE_COMPRESSED',
+    'FILE_ATTRIBUTE_OFFLINE', 'FILE_ATTRIBUTE_NOT_CONTENT_INDEXED',
+    'FILE_ATTRIBUTE_ENCRYPTED', 'FILE_ATTRIBUTE_INTEGRITY_STREAM',
+    'FILE_ATTRIBUTE_VIRTUAL', 'FILE_ATTRIBUTE_NO_SCRUB_DATA', 'FILE_ATTRIBUTE_EA',
+    'FILE_ATTRIBUTE_PINNED', 'FILE_ATTRIBUTE_UNPINNED', 'FILE_ATTRIBUTE_RECALL_ON_OPEN',
+    'FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS', 'GetFileAttributesW',
+    'FILE_FLAG_BACKUP_SEMANTICS', 'FILE_FLAG_DELETE_ON_CLOSE', 'FILE_FLAG_NO_BUFFERING',
+    'FILE_FLAG_OPEN_NO_RECALL', 'FILE_FLAG_OPEN_REPARSE_POINT', 'FILE_FLAG_OVERLAPPED',
+    'FILE_FLAG_POSIX_SEMANTICS', 'FILE_FLAG_RANDOM_ACCESS', 'FILE_FLAG_SESSION_AWARE',
+    'FILE_FLAG_SEQUENTIAL_SCAN', 'FILE_FLAG_WRITE_THROUGH', 'CREATE_NEW',
+    'CREATE_ALWAYS', 'OPEN_EXISTING', 'OPEN_ALWAYS', 'TRUNCATE_EXISTING', 'CreateFileW',
+    'OVERLAPPED', 'LPOVERLAPPED', 'DeviceIoControl', 'GetStdHandle', 'DuplicateHandle',
+    'SetHandleInformation', 'CloseHandle', 'GetLastError', 'FormatMessageA',
+    'FormatMessageW', 'SYSTEMTIME', 'LPSYSTEMTIME', 'GetLocalTime', 'SetLocalTime',
+    'GetSystemTime', 'SetSystemTime', 'WSADESCRIPTION_LEN', 'WSASYS_STATUS_LEN',
+    'WSADATA', 'LPWSADATA', 'WSAStartup', 'WSACleanup', 'CP_ACP', 'CP_OEMCP',
+    'CP_MACCP', 'CP_THREAD_ACP', 'CP_SYMBOL', 'CP_UTF7', 'CP_UTF8', 'GetConsoleCP',
+    'GetConsoleOutputCP', 'SetConsoleCP', 'SetConsoleOutputCP', 'PHANDLER_ROUTINE',
+    'SetConsoleCtrlHandler', 'LocalFree', 'MAKEWORD',
+)

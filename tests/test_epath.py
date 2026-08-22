@@ -14,6 +14,7 @@ from pathlib import Path as StdPath
 
 import utlx
 from utlx.epath import Path
+from utlx.platform import is_graalpy
 
 
 class TestPath(unittest.TestCase):
@@ -26,13 +27,17 @@ class TestPath(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(str(self.temp_dir), ignore_errors=True)
 
+    def test_aliases(self):
+        self.assertIs(Path.cleardir, Path.cleartree)
+        self.assertIs(Path.copydir, Path.copytree)
+
     def test_exists_and_mkdir(self):
         new_dir = self.temp_dir / "new"
         self.assertFalse(new_dir.exists())
         new_dir.mkdir()
         self.assertTrue(new_dir.exists())
 
-    def test_rmtree_and_cleardir(self):
+    def test_rmtree_and_cleartree(self):
         subdir = self.temp_dir / "sub"
         subdir.mkdir()
         (subdir / "file.txt").write_text("data")
@@ -42,7 +47,7 @@ class TestPath(unittest.TestCase):
         (subdir / "sub_sub" / "file.txt").write_text("data_sub")
         (subdir / "sub_sub" / "file_readonly.txt").write_text("data_sub_readonly")
         (subdir / "sub_sub" / "file_readonly.txt").chmod(stat.S_IREAD)
-        subdir.cleardir()
+        subdir.cleartree()
         self.assertTrue(subdir.exists())
         self.assertEqual(list(subdir.iterdir()), [])
 
@@ -58,12 +63,13 @@ class TestPath(unittest.TestCase):
 
         subdir = self.temp_dir / "nonexistent.txt"
         self.assertFalse(subdir.exists())
-        subdir.cleardir()
+        subdir.cleartree()
 
         subdir = self.file
         self.assertTrue(subdir.exists())
-        with self.assertRaises(NotADirectoryError):
-            subdir.cleardir()
+        with self.assertRaisesRegex(NotADirectoryError,
+                                    "The directory name is invalid:"):
+            subdir.cleartree()
 
     def test_rmtree_on_nonexistent_path_does_nothing(self):
         ghost = self.temp_dir / "ghost"
@@ -72,15 +78,18 @@ class TestPath(unittest.TestCase):
         except Exception as e:  # pragma: no cover
             self.fail(f"rmtree raised {e} unexpectedly")
 
-    def test_cleardir_on_symlink_raises(self):
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
+    def test_cleartree_on_symlink_raises(self):
         target = self.temp_dir / "target"
         target.mkdir()
         symlink = self.temp_dir / "link"
         symlink.symlink_to(target, target_is_directory=True)
-        with self.assertRaises(NotADirectoryError):
-            symlink.cleardir()
+        with self.assertRaisesRegex(NotADirectoryError,
+                                    "Cannot call cleartree on a symbolic link"):
+            symlink.cleartree()
 
-    def test_cleardir_on_symlink_when_has_file_attrs_is_false_raises(self):
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
+    def test_cleartree_on_symlink_when_has_file_attrs_is_false_raises(self):
         """Ensure Path.exists() uses the else branch of _is_real_link \
            when _HAS_FILE_ATTRS is False."""
         target = self.temp_dir / "target_else"
@@ -88,46 +97,47 @@ class TestPath(unittest.TestCase):
         symlink = self.temp_dir / "link_else"
         symlink.symlink_to(target, target_is_directory=True)
         with mock.patch("utlx.epath._HAS_FILE_ATTRS", False):
-            with self.assertRaises(NotADirectoryError):
-                symlink.cleardir()
+            with self.assertRaisesRegex(NotADirectoryError,
+                                        "Cannot call cleartree on a symbolic link"):
+                symlink.cleartree()
 
-    def test_copydir_basic(self):
+    def test_copytree_basic(self):
         src = self.temp_dir / "src_basic"
         src.mkdir()
         (src / "file1.txt").write_text("Hello")
         (src / "file2.txt").write_text("World")
         dst = self.temp_dir / "dst_basic"
 
-        copied = src.copydir(dst)
+        copied = src.copytree(dst)
 
         self.assertTrue((copied / "file1.txt").exists())
         self.assertTrue((copied / "file2.txt").exists())
         self.assertEqual((copied / "file1.txt").read_text(), "Hello")
         self.assertEqual((copied / "file2.txt").read_text(), "World")
 
-    def test_copydir_empty_directory(self):
+    def test_copytree_empty_directory(self):
         src = self.temp_dir / "src_empty"
         src.mkdir()
         dst = self.temp_dir / "dst_empty"
 
-        copied = src.copydir(dst)
+        copied = src.copytree(dst)
 
         self.assertTrue(copied.exists())
         self.assertTrue(copied.is_dir())
         self.assertEqual(list(copied.iterdir()), [])
 
-    def test_copydir_nested_empty_directories(self):
+    def test_copytree_nested_empty_directories(self):
         src = self.temp_dir / "src_nested"
         (src / "a" / "b" / "c").mkdir(parents=True)
         dst = self.temp_dir / "dst_nested"
 
-        copied = src.copydir(dst)
+        copied = src.copytree(dst)
 
         self.assertTrue((copied / "a" / "b" / "c").exists())
         self.assertTrue((copied / "a" / "b" / "c").is_dir())
         self.assertEqual(list((copied / "a" / "b" / "c").iterdir()), [])
 
-    def test_copydir_with_ignore(self):
+    def test_copytree_with_ignore(self):
         src = self.temp_dir / "src_ignore"
         src.mkdir()
         (src / "file1.txt").write_text("data")
@@ -137,13 +147,13 @@ class TestPath(unittest.TestCase):
         def ignore_func(dir, files):
             return ["file2.txt"]
 
-        copied = src.copydir(dst, ignore=ignore_func)
+        copied = src.copytree(dst, ignore=ignore_func)
 
         self.assertTrue(copied.exists())
         self.assertTrue((copied / "file1.txt").exists())
         self.assertFalse((copied / "file2.txt").exists())
 
-    def test_copydir_ignore_all(self):
+    def test_copytree_ignore_all(self):
         src = self.temp_dir / "src_ignore_all"
         src.mkdir()
         (src / "file1.txt").write_text("data")
@@ -153,12 +163,13 @@ class TestPath(unittest.TestCase):
         def ignore_all(dir, files):
             return files  # ignore all
 
-        copied = src.copydir(dst, ignore=ignore_all)
+        copied = src.copytree(dst, ignore=ignore_all)
 
         self.assertTrue(copied.exists())
         self.assertEqual(list(copied.iterdir()), [])
 
-    def test_copydir_with_symlinks(self):
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
+    def test_copytree_with_symlinks(self):
         src = self.temp_dir / "src_symlink"
         src.mkdir()
         target_file = src / "target.txt"
@@ -167,13 +178,13 @@ class TestPath(unittest.TestCase):
         symlink.symlink_to(target_file)
         dst = self.temp_dir / "dst_symlink"
 
-        copied = src.copydir(dst, symlinks=True)
+        copied = src.copytree(dst, symlinks=True)
         copied_link = copied / "link.txt"
 
         self.assertTrue(copied_link.is_symlink())
         self.assertEqual(copied_link.read_text(), "symlinked")
 
-    def test_copydir_with_custom_copy_function(self):
+    def test_copytree_with_custom_copy_function(self):
         src = self.temp_dir / "src_custom"
         src.mkdir()
         (src / "file.txt").write_text("original")
@@ -184,7 +195,7 @@ class TestPath(unittest.TestCase):
             with open(dst_path, "a") as f:
                 f.write(" [copied]")
 
-        copied = src.copydir(dst, copy_function=custom_copy)
+        copied = src.copytree(dst, copy_function=custom_copy)
         content = (copied / "file.txt").read_text()
 
         self.assertIn("original", content)
@@ -251,6 +262,7 @@ class TestPath(unittest.TestCase):
         self.assertTrue(dst.exists())
         self.assertEqual(dst.read_text(), "xyz")
 
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_copy_symlink_follow_false(self):
         target = self.temp_dir / "target.txt"
         target.write_text("xyz")
@@ -313,6 +325,7 @@ class TestPath(unittest.TestCase):
         self.assertTrue((expected / "file.txt").exists())
         self.assertTrue(src.exists())
 
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_copy_into_symlink_behavior(self):
         src = self.temp_dir / "src_symlink"
         src.mkdir()
@@ -555,6 +568,7 @@ class TestPath(unittest.TestCase):
         # Cleanup
         os.remove(symlink)
 
+    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_pushd_restores_directory_on_exception(self):
         original = StdPath.cwd()
         try:

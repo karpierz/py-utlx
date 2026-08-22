@@ -17,6 +17,8 @@ import contextlib
 
 import chardet
 
+from .platform._detect import is_graalpy
+
 __all__ = ('Path', 'UnsupportedOperation')
 
 StrPath:     TypeAlias = str | PathLike[str]
@@ -49,6 +51,136 @@ class Path(pathlib.Path):
 
         def relative_to(self, other: StrPath) -> Self:  # type: ignore[override]
             return super().relative_to(other)
+
+    if is_graalpy:  # pragma: no cover
+        # Patches and workarrounds for GraalPy bugs
+
+        def is_symlink(self) -> bool:
+            return super().is_symlink() or (os.name == "nt" and self._win_is_symlink())
+
+        def _win_is_symlink(self) -> bool:
+            from .platform.windows import winapi
+            attrs = winapi.GetFileAttributesW(str(self))
+            if attrs == 0xFFFFFFFF:
+                return False
+            return bool(attrs & winapi.FILE_ATTRIBUTE_REPARSE_POINT)
+
+        def readlink(self) -> Self:
+            if os.name != "nt":
+                return super().readlink()
+            else:
+                # GraalPy fallback: correct Windows implementation
+                target = self._win_readlink(str(self))
+                return type(self)(target)
+
+        @staticmethod
+        def _win_readlink(path: str) -> str:
+            """
+            Read the raw symlink target on Windows using DeviceIoControl.
+
+            This returns exactly the same string CPython returns:
+            - no normalization
+            - no resolving
+            - no absolute path conversion
+            - no separator changes
+            """
+            import ctypes as ct
+            from .platform.windows import winapi
+            from .platform.windows.winapi import USHORT, ULONG, DWORD, WCHAR, UCHAR
+
+            # Constants for Windows reparse point handling
+            FSCTL_GET_REPARSE_POINT = 0x000900A8
+            IO_REPARSE_TAG_SYMLINK  = 0xA000000C
+
+            # Structure used by FSCTL_GET_REPARSE_POINT
+
+            MAX_BUFFER_LEN = 0x3FF0
+
+            class REPARSE_DATA_BUFFER(ct.Structure):
+
+                class _DummyUnion(ct.Union):
+
+                    class SymbolicLinkReparseBuffer_Struct(ct.Structure):
+                        _fields_ = [
+                            ("SubstituteNameOffset", USHORT),
+                            ("SubstituteNameLength", USHORT),
+                            ("PrintNameOffset",      USHORT),
+                            ("PrintNameLength",      USHORT),
+                            ("Flags",                ULONG),
+                            ("PathBuffer",           WCHAR * MAX_BUFFER_LEN),
+                        ]
+
+                    class MountPointReparseBuffer_Struct(ct.Structure):
+                        _fields_ = [
+                            ("SubstituteNameOffset", USHORT),
+                            ("SubstituteNameLength", USHORT),
+                            ("PrintNameOffset",      USHORT),
+                            ("PrintNameLength",      USHORT),
+                            ("PathBuffer",           WCHAR * MAX_BUFFER_LEN),
+                        ]
+
+                    class GenericReparseBuffer_Struct(ct.Structure):
+                        _fields_ = [
+                            ("DataBuffer", UCHAR * MAX_BUFFER_LEN),
+                        ]
+
+                    _fields_ = [
+                        ("SymbolicLinkReparseBuffer", SymbolicLinkReparseBuffer_Struct),
+                        ("MountPointReparseBuffer",   MountPointReparseBuffer_Struct),
+                        ("GenericReparseBuffer",      GenericReparseBuffer_Struct),
+                    ]
+                # _anonymous_ = ("_",)
+                _fields_ = [
+                    ("ReparseTag",        ULONG),
+                    ("ReparseDataLength", USHORT),
+                    ("Reserved",          USHORT),
+                    ("_",            _DummyUnion),
+                ]
+            # PREPARSE_DATA_BUFFER = ct.POINTER(REPARSE_DATA_BUFFER)
+
+            # Open the reparse point without following it
+            handle = winapi.CreateFileW(
+                path,
+                0,
+                0,
+                None,
+                winapi.OPEN_EXISTING,
+                winapi.FILE_FLAG_OPEN_REPARSE_POINT
+                | winapi.FILE_FLAG_BACKUP_SEMANTICS,
+                None
+            )
+
+            if handle == -1:
+                raise OSError("Cannot open reparse point")
+
+            buf = REPARSE_DATA_BUFFER()
+            bytes_returned = DWORD()
+
+            ok = winapi.DeviceIoControl(
+                handle,
+                FSCTL_GET_REPARSE_POINT,
+                None,
+                0,
+                ct.byref(buf),
+                ct.sizeof(buf),
+                ct.byref(bytes_returned),
+                None
+            )
+
+            winapi.CloseHandle(handle)
+
+            if not ok:
+                raise OSError("DeviceIoControl failed")
+
+            if buf.ReparseTag != IO_REPARSE_TAG_SYMLINK:
+                raise OSError("Not a symlink")
+
+            # Extract the exact PrintName (human-readable target)
+            symlink_reparse_buffer = buf._.SymbolicLinkReparseBuffer
+            offset = symlink_reparse_buffer.PrintNameOffset // 2
+            length = symlink_reparse_buffer.PrintNameLength // 2
+            result: str = symlink_reparse_buffer.PathBuffer[offset:offset + length]
+            return result
 
     def exists(self) -> bool:
         return super().exists() or self._is_real_link()
@@ -278,14 +410,8 @@ class Path(pathlib.Path):
     def chdir(self) -> None:
         os.chdir(self)
 
-    @contextlib.contextmanager
-    def pushd(self) -> Generator[None, None, None]:
-        curr_dir = os.getcwd()
-        os.chdir(self)
-        try:
-            yield
-        finally:
-            os.chdir(curr_dir)
+    def pushd(self) -> contextlib.chdir[str]:
+        return contextlib.chdir(str(self))
 
 
 del Self, Callable, Iterable, Generator, PathLike

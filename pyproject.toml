@@ -3,11 +3,11 @@
 
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = [ "setuptools>=80.10.2", "packaging>=26.0.0" ]
+requires = [ "setuptools>=81.0.0", "packaging>=26.3.0" ]
 
 [project]
 name = "py-utlx"
-version = "2.3.1"
+version = "2.4.1"
 description = "Python utilities."
 keywords = [ "py-utlx", "utlx", "util", "utils" ]
 license = "Zlib"
@@ -25,7 +25,7 @@ urls.Download      = "https://pypi.org/project/py-utlx/"
 urls.Repository    = "https://github.com/karpierz/py-utlx"
 urls.Tracker       = "https://github.com/karpierz/py-utlx/issues"
 urls.Sponsoring    = "https://www.paypal.com/donate/?hosted_button_id=FX8L7CJUGLW7S"
-requires-python = ">=3.10.0,<4.0.0"
+requires-python = ">=3.11.0,<4.0.0"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
@@ -33,7 +33,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -41,6 +40,7 @@ classifiers = [
   "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: Python :: Implementation :: GraalPy",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
@@ -50,37 +50,39 @@ dynamic = [ "readme" ]
 # entry-points.utlx.magical.epoint = "utlx:main_epoint"
 dependencies = [
   # mandatory
-  "typing-extensions>=4.15.0",
-  "pkg-about>=2.1.0",
+  "typing-extensions>=4.16.0",
+  "pkg-about>=2.4.0",
   # others
-  "chardet>=7.4.3",
+  "chardet>=7.6.0",
 ]
 
 [dependency-groups]
 base = [
-  "pip>=25.3",
-  "setuptools>=80.10.2",
+  "pip>=26.2.1; platform_python_implementation!='GraalVM'",
+  "pip>=24.3.1; platform_python_implementation=='GraalVM'",
+  "setuptools>=81.0.0",
 ]
 test = [
   { include-group = "base" },
-  "deepdiff>=8.6.1; python_version<'3.15' and python_version>'3.10'",
-  "deepdiff<=9.0.0; python_version>='3.15' or python_version<='3.10'",
-  "rich>=14.3.1",
+  "deepdiff>=9.1.0; python_version<'3.15' and platform_python_implementation!='GraalVM'",
+  "deepdiff<=9.0.0; python_version>='3.15' or platform_python_implementation=='GraalVM'",
+  "rich>=15.0.0",
 ]
 coverage = [
   { include-group = "test" },
-  "coverage>=7.13.2",
+  "coverage>=7.15.4",
   "covdefaults>=2.3.0",
-  "diff-cover>=10.2.0",
+  "diff-cover>=10.5.1",
 ]
 docs = [
   { include-group = "base" },
-  "sphinx>=8.1.3",
+  "sphinx>=9.0.4",
   "pygments_ansi_color>=0.3.0", # fix sphinx load error
   "roman_numerals>=4.1.0",      #         -||-
-  "sphinx-autodoc-typehints>=3.0.1",
-  "sphinx-toolbox>=4.1.2",
-  "sphinx-tabs>=3.4.5", # Do not change - sphinx-toolbox requires <3.4.7
+  "myst-parser>=5.1.0",
+  "sphinx-autodoc-typehints>=3.6.1",
+  "sphinx-tabs>=3.5.0",
+  "sphinx-prompt>=1.10.2",
   "sphinx-copybutton>=0.5.2",
   "sphinxcontrib-spelling>=8.0.2",
   "sphinx-lint>=1.0.2",
@@ -90,17 +92,17 @@ docs = [
 build = [
   { include-group = "test" },
   "check-manifest>=0.51",
-  "build>=1.4.0",
-  "twine>=6.2.0",
+  "build>=1.5.0",
+  "twine>=7.0.0",
 ]
 publish = [
-  "twine>=6.2.0",
+  "twine>=7.0.0",
 ]
 typing = [
   { include-group = "base" },
-  "mypy>=1.19.1",
-  "mypy_extensions>=1.1.0",
-  "types-setuptools>=80.10.0.20260124",
+  "mypy>=2.3.1",
+  "mypy-extensions>=1.1.0",
+  "types-setuptools>=81.0.0.20260209",
 ]
 lint = [
   { include-group = "test" },
@@ -216,7 +218,7 @@ ignore = [
 count = true
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 sqlite_cache = true
 warn_unused_configs = true

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import typing
+from typing import Any
 import ctypes as ct
 from ctypes import WinDLL as DLL
 try:
@@ -14,6 +16,7 @@ except ImportError:  # pragma: no cover
 from ctypes import WINFUNCTYPE as CFUNC
 from ctypes import windll
 
+from .._detect import is_graalpy
 from ... import ctypes as ctx
 
 __all__ = (
@@ -23,6 +26,14 @@ __all__ = (
     'sockaddr', 'in_addr', 'sockaddr_in', 'in6_addr', 'sockaddr_in6',
     'FD_SETSIZE', 'fd_set', 'FD_ZERO', 'FD_ISSET', 'FD_SET', 'FD_CLR', 'select',
 )
+
+if not is_graalpy:
+    memset = ct.memset
+else:  # pragma: no cover
+    libc = ct.cdll.msvcrt
+    memset = typing.cast(Any, libc.memset)
+    memset.argtypes = [ct.c_void_p, ct.c_int, ct.c_int]
+    memset.restype  = ct.c_void_p
 
 # Types
 
@@ -123,8 +134,10 @@ class fd_set(ct.Structure):
 def FD_ZERO(fdsetp: ctx.POINTER[fd_set]) -> None:
     import ctypes as ct
     fdset = fdsetp.contents
-    ct.memset(fdsetp, 0, ct.sizeof(fdset))
-FD_ZERO = CFUNC(None, ct.POINTER(fd_set))(FD_ZERO)
+    memset(fdsetp, 0, ct.sizeof(fdset))
+if not is_graalpy:
+    FD_ZERO = CFUNC(None, ct.POINTER(fd_set))(FD_ZERO)
+else: pass  # pragma: no cover
 
 def FD_ISSET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> int:
     fdset = fdsetp.contents
@@ -132,7 +145,9 @@ def FD_ISSET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> int:
         if fdset.fd_array[i] == fd:
             return 1
     return 0
-FD_ISSET = CFUNC(ct.c_int, ct.c_int, ct.POINTER(fd_set))(FD_ISSET)
+if not is_graalpy:
+    FD_ISSET = CFUNC(ct.c_int, ct.c_int, ct.POINTER(fd_set))(FD_ISSET)
+else: pass  # pragma: no cover
 
 def FD_SET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
@@ -140,7 +155,9 @@ def FD_SET(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
         fdset.fd_array[fdset.fd_count] = fd
         fdset.fd_count += 1
     else: pass  # pragma: no cover
-FD_SET = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_SET)
+if not is_graalpy:
+    FD_SET = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_SET)
+else: pass  # pragma: no cover
 
 def FD_CLR(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
     fdset = fdsetp.contents
@@ -151,7 +168,9 @@ def FD_CLR(fd: int, fdsetp: ctx.POINTER[fd_set]) -> None:
             fdset.fd_array[fdset.fd_count - 1] = 0
             fdset.fd_count -= 1
             break
-FD_CLR = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_CLR)
+if not is_graalpy:
+    FD_CLR = CFUNC(None, ct.c_int, ct.POINTER(fd_set))(FD_CLR)
+else: pass  # pragma: no cover
 
 select = windll.Ws2_32.select
 select.restype  = ct.c_int
@@ -159,4 +178,4 @@ select.argtypes = [ct.c_int,
                    ct.POINTER(fd_set), ct.POINTER(fd_set), ct.POINTER(fd_set),
                    ct.POINTER(timeval)]
 
-del ct, ctx, windll
+del is_graalpy, ct, ctx, windll

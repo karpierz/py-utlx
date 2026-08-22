@@ -3,14 +3,16 @@
 
 import unittest
 import sys
+import os
 import platform
 import types
 import tempfile
+import threading
 import shutil
 from pathlib import Path
 
 import utlx
-from utlx.imports import import_static, import_file
+from utlx.imports import import_static, import_file, import_absolute
 from utlx.platform import is_pypy
 
 
@@ -105,3 +107,145 @@ class TestImportFile(unittest.TestCase):
         mod1 = import_file(self.pkg_dir)
         mod2 = import_file(self.pkg_dir, reload=True)
         self.assertIsNot(mod1, mod2)
+
+    def test_handles_non_path_entries(self):
+        sys.path.insert(0, None)
+        sys.path.insert(0, object())
+        temp = Path(tempfile.mkdtemp()) / "mod.py"
+        temp.write_text("x = 1\n")
+        try:
+            import_file(temp, strict_sys_path=True)
+        except ImportError:
+            pass  # expected
+        finally:
+            sys.path = [p for p in sys.path if isinstance(p, str)]
+            shutil.rmtree(temp.parent)
+
+    def test_handles_invalid_path_resolution(self):
+        temp = Path(tempfile.mkdtemp()) / "mod.py"
+        temp.write_text("x = 1\n")
+
+        # Insert a value that makes Path(p) fail during sys.path scanning
+        bad_entry = object()
+        sys.path.insert(0, bad_entry)
+
+        try:
+            with self.assertRaisesRegex(ImportError,
+                                        "Module path '.+' is not within "):
+                import_file(temp)
+        finally:
+            sys.path.pop(0)
+            shutil.rmtree(temp.parent)
+
+    def test_handles_unresolvable_module_path(self):
+        # Create a dummy object that will break Path(path)
+        bad_path = object()
+
+        # The function should raise ImportError when Path(path) fails
+        with self.assertRaisesRegex(ImportError,
+                                    "Cannot resolve module path"):
+            import_file(bad_path)
+
+
+class TestImportAbsolute(unittest.TestCase):
+
+    def setUp(self):
+        self.org_cwd = Path.cwd()
+        self.cwd = Path(tempfile.mkdtemp())
+        self.local_mod = self.cwd / "platform.py"
+        self.local_mod.write_text("X = 123\n")
+        self.temp_dir = Path(tempfile.mkdtemp())
+        # symlink to CWD (if supported)
+        self.symlink = self.temp_dir / "cwd_link"
+        try:
+            self.symlink.symlink_to(self.cwd, target_is_directory=True)
+            self.has_symlink = True
+        except Exception:  # pragma: no cover
+            self.has_symlink = False
+        os.chdir(self.cwd)
+
+    def tearDown(self):
+        if os.path.isdir(self.org_cwd):
+            os.chdir(self.org_cwd)
+        else: pass  # pragma: no cover
+        shutil.rmtree(self.temp_dir)
+        shutil.rmtree(self.cwd)
+
+    def test_removes_empty_string(self):
+        sys.path.insert(0, "")
+        with utlx.imports.import_absolute():
+            self.assertNotIn("", sys.path)
+        self.assertIn("", sys.path)
+
+    def test_removes_dot(self):
+        sys.path.insert(0, ".")
+        with utlx.imports.import_absolute():
+            self.assertNotIn(".", sys.path)
+        self.assertIn(".", sys.path)
+
+    def test_removes_dot_slash(self):
+        sys.path.insert(0, "./")
+        with utlx.imports.import_absolute():
+            self.assertNotIn("./", sys.path)
+        self.assertIn("./", sys.path)
+
+    def test_removes_absolute_cwd(self):
+        sys.path.insert(0, str(self.cwd))
+        with utlx.imports.import_absolute():
+            self.assertNotIn(str(self.cwd), sys.path)
+        self.assertIn(str(self.cwd), sys.path)
+
+    def test_removes_symlink_to_cwd(self):
+        if not self.has_symlink:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
+        sys.path.insert(0, str(self.symlink))
+        with utlx.imports.import_absolute():
+            self.assertNotIn(str(self.symlink), sys.path)
+        self.assertIn(str(self.symlink), sys.path)
+
+    def test_does_not_remove_other_paths(self):
+        sys.path.insert(0, "/usr")
+        with utlx.imports.import_absolute():
+            self.assertIn("/usr", sys.path)
+
+    def test_restores_sys_path(self):
+        original = sys.path.copy()
+        with utlx.imports.import_absolute():
+            pass
+        self.assertEqual(sys.path, original)
+
+    def test_import_ignores_local_shadowing(self):
+        # local platform.py should NOT be imported
+        with utlx.imports.import_absolute():
+            import platform as p
+        self.assertNotEqual(getattr(p, "__file__", ""), str(self.local_mod))
+
+    def test_thread_safety(self):
+        # sanity check: no crashes, no corruption
+        def worker():
+            for _ in range(100):
+                with utlx.imports.import_absolute():
+                    pass
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        self.assertTrue(True)  # if we got here, it's fine
+
+    def test_handles_normalization_exception(self):
+        sys.path.insert(0, None)
+        with import_absolute():
+            # None should trigger Exception in _normalize_path
+            self.assertIn(None, sys.path)
+
+    def test_handles_valueerror_on_remove(self):
+        sys.path.insert(0, ".")
+        with import_absolute():
+            # simulate ValueError by removing manually before context
+            try:
+                sys.path.remove(".")
+            except ValueError:
+                pass
+            # context should handle gracefully
+            self.assertTrue(True)
