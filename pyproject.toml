@@ -7,7 +7,7 @@ requires = [ "setuptools>=81.0.0", "packaging>=26.3.0" ]
 
 [project]
 name = "py-utlx"
-version = "2.4.1"
+version = "2.5.3"
 description = "Python utilities."
 keywords = [ "py-utlx", "utlx", "util", "utils" ]
 license = "Zlib"
@@ -51,7 +51,7 @@ dynamic = [ "readme" ]
 dependencies = [
   # mandatory
   "typing-extensions>=4.16.0",
-  "pkg-about>=2.4.0",
+  "pkg-about>=2.5.0",
   # others
   "chardet>=7.6.0",
 ]
@@ -59,20 +59,20 @@ dependencies = [
 [dependency-groups]
 base = [
   "pip>=26.2.1; platform_python_implementation!='GraalVM'",
-  "pip>=24.3.1; platform_python_implementation=='GraalVM'",
+  "pip>=26.1.2; platform_python_implementation=='GraalVM' and python_version~='3.13.0'",
+  "pip>=24.3.1; platform_python_implementation=='GraalVM' and python_version~='3.12.0'",
   "setuptools>=81.0.0",
 ]
 test = [
   { include-group = "base" },
-  "deepdiff>=9.1.0; python_version<'3.15' and platform_python_implementation!='GraalVM'",
-  "deepdiff<=9.0.0; python_version>='3.15' or platform_python_implementation=='GraalVM'",
+  "deepdiff~=9.0.0",
   "rich>=15.0.0",
 ]
 coverage = [
   { include-group = "test" },
-  "coverage>=7.15.4",
+  "coverage>=7.16.2",
   "covdefaults>=2.3.0",
-  "diff-cover>=10.5.1",
+  "diff-cover>=10.6.0",
 ]
 docs = [
   { include-group = "base" },
@@ -92,7 +92,7 @@ docs = [
 build = [
   { include-group = "test" },
   "check-manifest>=0.51",
-  "build>=1.5.0",
+  "build>=1.6.1",
   "twine>=7.0.0",
 ]
 publish = [
@@ -100,13 +100,13 @@ publish = [
 ]
 typing = [
   { include-group = "base" },
-  "mypy>=2.3.1",
+  "mypy>=2.4.0",
   "mypy-extensions>=1.1.0",
   "types-setuptools>=81.0.0.20260209",
 ]
 lint = [
   { include-group = "test" },
-  "flake8>=7.3.0",
+  "flake8>=7.4.1",
   "flake8-in-file-ignores>=0.3.0",
   "flake8-pyproject>=1.2.4",
   "flake8-docstrings>=1.7.0",
@@ -160,6 +160,8 @@ report.exclude_also = [
   '''^\s*@unittest\.skipIf\s*\(\s*sys\.platform\.startswith\s*\(\s*['"]win['"]\s*\)''',
   '^\s*@unittest\.skipIf\s*\(\s*is_windows\s*,',
   '^\s*@unittest\.skipIf\s*\(\s*is_cpython\s*,',
+  '^\s*@unittest\.skipUnless\s*\(\s*is_linux\s*,',
+  '^\s*@unittest\.skipUnless\s*\(\s*is_macos\s*,',
   '\s*if\s+typing\.TYPE_CHECKING\s*:',
 ]
 report.omit = [

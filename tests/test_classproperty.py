@@ -34,7 +34,7 @@ class TestClassProperty(unittest.TestCase):
                 return 42
 
         self.assertEqual(MyClass.value, 42)
-        self.assertEqual(MyClass.__dict__['value'].__doc__, "Returns a fixed value")
+        self.assertEqual(MyClass.__dict__["value"].__doc__, "Returns a fixed value")
 
     def test_classproperty_without_fget_raises(self):
         cp = classproperty()

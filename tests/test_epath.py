@@ -23,6 +23,19 @@ class TestPath(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp())
         self.file = self.temp_dir / "test.txt"
         self.file.write_text("Hello World\nHello Python\n")
+        with tempfile.TemporaryDirectory() as d:
+            tdir = StdPath(d)
+            target = tdir / "target"
+            symlink = tdir / "link"
+            target.touch()
+            try:
+                # symlink.symlink_to(target)
+                os.symlink(str(target), str(symlink))
+                self.symlink_supported = True
+            except OSError as exc:  # pragma: no cover
+                self.symlink_supported = not (exc.errno == 40)
+            except Exception:  # pragma: no cover
+                self.symlink_supported = True
 
     def tearDown(self):
         shutil.rmtree(str(self.temp_dir), ignore_errors=True)
@@ -80,6 +93,8 @@ class TestPath(unittest.TestCase):
 
     @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_cleartree_on_symlink_raises(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         target = self.temp_dir / "target"
         target.mkdir()
         symlink = self.temp_dir / "link"
@@ -92,6 +107,8 @@ class TestPath(unittest.TestCase):
     def test_cleartree_on_symlink_when_has_file_attrs_is_false_raises(self):
         """Ensure Path.exists() uses the else branch of _is_real_link \
            when _HAS_FILE_ATTRS is False."""
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         target = self.temp_dir / "target_else"
         target.mkdir()
         symlink = self.temp_dir / "link_else"
@@ -170,6 +187,8 @@ class TestPath(unittest.TestCase):
 
     @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_copytree_with_symlinks(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         src = self.temp_dir / "src_symlink"
         src.mkdir()
         target_file = src / "target.txt"
@@ -251,6 +270,8 @@ class TestPath(unittest.TestCase):
         self.assertTrue(src.exists())
 
     def test_copy_symlink_follow_true(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         target = self.temp_dir / "target.txt"
         target.write_text("xyz")
         link = self.temp_dir / "link.txt"
@@ -264,6 +285,8 @@ class TestPath(unittest.TestCase):
 
     @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_copy_symlink_follow_false(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         target = self.temp_dir / "target.txt"
         target.write_text("xyz")
         link = self.temp_dir / "link.txt"
@@ -287,6 +310,8 @@ class TestPath(unittest.TestCase):
         self.assertAlmostEqual(dst.stat().st_mtime, src.stat().st_mtime, delta=1.0)
 
     def test_copy_symlink_dir(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         dir_target = self.temp_dir / "dir_target"
         dir_target.mkdir()
         link = self.temp_dir / "dir_link"
@@ -327,6 +352,8 @@ class TestPath(unittest.TestCase):
 
     @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
     def test_copy_into_symlink_behavior(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         src = self.temp_dir / "src_symlink"
         src.mkdir()
 
@@ -512,10 +539,9 @@ class TestPath(unittest.TestCase):
 
     @mock.patch.object(os, 'link', side_effect=NotImplementedError, create=True)
     def test_hardlink_to_not_supported(self, _):
-        if sys.version_info[:2] >= (3, 11) or not hasattr(os, "link"):
+        if sys.version_info[:2] >= (3, 11) or not hasattr(os, "link"):  # pragma: no branch
             with self.assertRaises(NotImplementedError):
                 (self.temp_dir / "hard.txt").hardlink_to(self.file)
-        else: pass  # pragma: no cover
 
     def test_copystat_copies_mtime(self):
         with tempfile.NamedTemporaryFile() as src_file, \
@@ -541,6 +567,8 @@ class TestPath(unittest.TestCase):
             self.assertEqual(src_stat.st_mtime_ns, dst_stat_after.st_mtime_ns)
 
     def test_copystat_symlink_behavior(self):
+        if is_graalpy and not self.symlink_supported:
+            self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         with tempfile.NamedTemporaryFile() as src_file, \
              tempfile.NamedTemporaryFile() as dst_file:
 
@@ -568,7 +596,8 @@ class TestPath(unittest.TestCase):
         # Cleanup
         os.remove(symlink)
 
-    @unittest.skipIf(is_graalpy, "This test is skipped on GraalPy")
+    @unittest.skipIf(is_graalpy and sys.version_info[:2] <= (3, 12),
+                     "This test is skipped on GraalPy <= 3.12")
     def test_pushd_restores_directory_on_exception(self):
         original = StdPath.cwd()
         try:

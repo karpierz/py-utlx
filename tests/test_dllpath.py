@@ -40,13 +40,10 @@ class TestDllPathWindows(unittest.TestCase):
         result = dll_path(invalid_handle)
         self.assertIsNone(result)
 
-    @unittest.skipIf(is_pypy and sys.version_info[:2] >= (3, 11),
-                     "This test is skipped on PyPy 3.11+")
     def test_dll_path_with_dynamic_windll_loading(self):
         # Load DLL dynamically using WinDLL
         dll = ct.WinDLL("kernel32.dll")
-        handle = dll._handle
-        path = dll_path(handle)
+        path = dll_path(dll)
         self.assertIsInstance(path, Path)
         self.assertTrue(path.exists(), f"Dynamically loaded DLL path does not exist: {path}")
         self.assertTrue(path.name.lower().endswith("kernel32.dll"))

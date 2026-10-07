@@ -3,7 +3,7 @@
 
 from typing import TypeAlias, Any
 from typing_extensions import Self
-from collections.abc import Callable, Iterable, Generator
+from collections.abc import Callable, Iterable
 from os import PathLike
 import sys
 import os
@@ -17,12 +17,16 @@ import contextlib
 
 import chardet
 
-from .platform._detect import is_graalpy
+from .platform._detect import is_pypy, is_graalpy
 
 __all__ = ('Path', 'UnsupportedOperation')
 
 StrPath:     TypeAlias = str | PathLike[str]
 AnyCallable: TypeAlias = Callable[..., Any]
+
+if is_pypy and not hasattr(stat, "IO_REPARSE_TAG_MOUNT_POINT"):  # pragma: no cover
+    # due to bug in PyPy 3.12
+    stat.IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003  # type: ignore[misc]
 
 _HAS_FILE_ATTRS = hasattr(os.stat_result, "st_file_attributes")
 
@@ -253,7 +257,7 @@ class Path(pathlib.Path):
             self.chmod(stat.S_IWRITE)
             return super().unlink(missing_ok=missing_ok)
 
-    if sys.version_info[:2] <= (3, 13):
+    if sys.version_info[:2] <= (3, 13):  # pragma: no branch
 
         def copy(self, target: StrPath, *,
                  follow_symlinks: bool = True, preserve_metadata: bool = False) -> Self:
@@ -324,8 +328,6 @@ class Path(pathlib.Path):
                 are created from methods like `iterdir()`.
                 """
                 return type(self)(*pathsegments)
-
-    else: pass  # pragma: no cover
 
     def copystat(self, target: StrPath, *, follow_symlinks: bool = True) -> None:
         return shutil.copystat(self, target, follow_symlinks=follow_symlinks)
@@ -412,7 +414,3 @@ class Path(pathlib.Path):
 
     def pushd(self) -> contextlib.chdir[str]:
         return contextlib.chdir(str(self))
-
-
-del Self, Callable, Iterable, Generator, PathLike
-del StrPath, AnyCallable

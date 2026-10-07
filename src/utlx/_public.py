@@ -55,7 +55,3 @@ def private(thing: ModuleAware) -> ModuleAware:
     if thing.__name__ in dunder_all:
         dunder_all.remove(thing.__name__)
     return thing
-
-
-del ModuleAware
-del overload, TypeVar, Callable

@@ -6,9 +6,10 @@ __all__ = ('arch',)
 
 def get_python_arch() -> str | None:
     import sys
+    import struct
     import platform
     machine = platform.machine().lower()
-    is_32bits = (sys.maxsize <= 2**32)
+    is_32bits = (struct.calcsize("P") <= 4)
     little_endian = sys.byteorder.lower() == "little"
 
     X86_64      = ("x86_64", "amd64")

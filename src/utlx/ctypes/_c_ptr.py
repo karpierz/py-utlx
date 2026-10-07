@@ -142,9 +142,6 @@ def c_ptr_isub(ptr: POINTER[Any], other: SupportsIndex) -> None:
     void_p.value = (void_p.value or 0) - offset  # * ctypes.sizeof(ptr._type_)
 
 
-del SupportsIndex, Any
-
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod()

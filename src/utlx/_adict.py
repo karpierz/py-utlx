@@ -5,7 +5,6 @@
 
 from typing import Any
 from typing_extensions import Self
-from collections.abc import Iterable
 from collections import defaultdict
 
 __all__ = ('adict', 'defaultadict')
@@ -72,6 +71,3 @@ class defaultadict(__adict, defaultdict[Any, Any]):
     def __copy__(self) -> Self:
         """Return a shallow copy of the defaultadict."""
         return self.copy()
-
-
-del Self, Iterable, defaultdict

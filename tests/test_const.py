@@ -32,7 +32,7 @@ class TestConstDescriptors(unittest.TestCase):
         class Example:
             value = const(1, doc="This is a constant")
 
-        self.assertEqual(Example.__dict__['value'].__doc__, "This is a constant")
+        self.assertEqual(Example.__dict__["value"].__doc__, "This is a constant")
 
     def test_weakconst_returns_value(self):
         class Ref:
@@ -86,4 +86,4 @@ class TestConstDescriptors(unittest.TestCase):
         class Example:
             value = weakconst(ref, doc="Weak reference")
 
-        self.assertEqual(Example.__dict__['value'].__doc__, "Weak reference")
+        self.assertEqual(Example.__dict__["value"].__doc__, "Weak reference")

@@ -20,4 +20,4 @@ else:
         raise NotImplementedError("from_oid() currently works only on CPython!\n"
                                   f"Current interpreter: {python_implementation()}")
 
-del Any, ctypes, is_cpython
+del ctypes, is_cpython

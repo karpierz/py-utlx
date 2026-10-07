@@ -46,6 +46,3 @@ class classproperty(Generic[_C, _T]):
     def getter(self, fget: Callable[[_C], _T] | None = None) -> Self:
         self._fget = fget
         return self
-
-
-del TypeVar, Generic, Self, Callable

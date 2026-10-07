@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Zlib
 
 import sys
+import struct
 import os
 import platform
 
@@ -26,7 +27,7 @@ is_sunos   = sys.platform.startswith(("sunos", "solaris"))
 is_aix     = sys.platform.startswith("aix")
 is_android = hasattr(sys, "getandroidapilevel")
 is_posix   = (os.name == "posix")
-is_32bits  = (sys.maxsize <= 2**32)
+is_32bits  = (struct.calcsize("P") <= 4)
 is_ucs2    = (sys.maxunicode < 0x10FFFF)
 is_cpython = (platform.python_implementation().lower() == "cpython")
 is_pypy    = (platform.python_implementation().lower() == "pypy")
@@ -34,4 +35,4 @@ is_graalpy = (platform.python_implementation().lower() == "graalvm")
 is_ironpython = (platform.python_implementation().lower() == "ironpython"
                  or "cli" in (platform.system().lower(), sys.platform))
 
-del sys, os, platform
+del sys, struct, os, platform
