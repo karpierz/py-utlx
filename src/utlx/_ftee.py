@@ -51,7 +51,3 @@ def ftee(*filenames: StrPath) -> Generator[TextIO | _Tee, None, None]:
     finally:
         sys.stdout.close()
         sys.stdout = stdout
-
-
-del TextIO, Generator, StrPath, PathLike
-del io, contextlib

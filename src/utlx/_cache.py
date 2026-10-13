@@ -86,6 +86,3 @@ def cached_property(fget: Callable[[_P], _T] | None = None,
                 fdel(self)
 
     return property(_fget, _fset, _fdel, doc)
-
-
-del TypeVar, TypeAlias, Callable, AnyCallable

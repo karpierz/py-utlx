@@ -128,15 +128,11 @@ def import_absolute() -> Generator[None, None, None]:
                     the_same_as_cwd = cwd.samefile(path)
                 except Exception:  # pragma: no cover
                     continue
-                if the_same_as_cwd:
+                if the_same_as_cwd:  # pragma: no branch
                     try:
                         sys.path.remove(path)
                     except ValueError:  # pragma: no cover
                         pass
-                else: pass  # pragma: no cover
             yield
         finally:
             sys.path[:] = org_sys_path
-
-
-del StrPath, PathLike

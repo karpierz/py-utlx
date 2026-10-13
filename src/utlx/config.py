@@ -58,8 +58,3 @@ def set_config(fglobals: dict[str, Any], **cfg_dict: Any) -> None:
            and mod_name != config_name):
             del sys.modules[mod_name]
     importlib.reload(sys.modules[package_name])
-
-
-del Any
-del Path
-del configparser

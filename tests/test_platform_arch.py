@@ -3,8 +3,9 @@
 
 import unittest
 from unittest import mock
-import platform
 import sys
+import platform
+from struct import calcsize as org_calcsize
 
 import utlx
 from utlx import module_path
@@ -15,7 +16,8 @@ class TestWindowsArchDetection(unittest.TestCase):
 
     def run_arch_test(self, machine_value, is_32bits, expected):
         with mock.patch("platform.machine", return_value=machine_value), \
-             mock.patch("sys.maxsize", 2**32 if is_32bits else 2**64):
+             mock.patch("struct.calcsize", side_effect=lambda fmt: (4 if is_32bits else 8)
+                                                       if fmt == "P" else org_calcsize(fmt)):
             import utlx.platform
             _arch = import_file(module_path(utlx.platform)/"windows/_arch.py", reload=True)
             result = _arch.get_python_arch()
@@ -48,7 +50,8 @@ class TestLinuxArchDetection(unittest.TestCase):
     def run_arch_test(self, machine_value, is_32bits, expected,
                       fpu_present=None, byteorder="little"):
         with mock.patch("platform.machine", return_value=machine_value), \
-             mock.patch("sys.maxsize", 2**32 if is_32bits else 2**64), \
+             mock.patch("struct.calcsize", side_effect=lambda fmt: (4 if is_32bits else 8)
+                                                       if fmt == "P" else org_calcsize(fmt)), \
              mock.patch("sys.byteorder", byteorder):
             import utlx.platform
             # optional mock of has_fpu()
@@ -145,7 +148,8 @@ class TestMacOSArchDetection(unittest.TestCase):
 
     def run_arch_test(self, machine_value, is_32bits, expected):
         with mock.patch("platform.machine", return_value=machine_value), \
-             mock.patch("sys.maxsize", 2**32 if is_32bits else 2**64):
+             mock.patch("struct.calcsize", side_effect=lambda fmt: (4 if is_32bits else 8)
+                                                       if fmt == "P" else org_calcsize(fmt)):
             import utlx.platform
             _arch = import_file(module_path(utlx.platform)/"macos/_arch.py", reload=True)
             result = _arch.get_python_arch()

@@ -1,6 +1,7 @@
 # Copyright (c) 1994 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
+import sys
 import ctypes
 
 from ._detect import is_graalpy
@@ -24,8 +25,9 @@ LONG_MAX   = ULONG_MAX >> 1
 LONG_MIN   = -LONG_MAX - 1
 ULLONG_MAX = (((ULONG_MAX << ((ctypes.sizeof(ctypes.c_ulonglong)
               - ctypes.sizeof(ctypes.c_ulong)) * 8)) + ULONG_MAX)
-              if is_graalpy else ctypes.c_ulonglong(-1).value)
+              if is_graalpy and sys.version_info[:2] <= (3, 12)
+              else ctypes.c_ulonglong(-1).value)
 LLONG_MAX  = ULLONG_MAX >> 1
 LLONG_MIN  = -LLONG_MAX - 1
 
-del ctypes, is_graalpy
+del sys, ctypes, is_graalpy

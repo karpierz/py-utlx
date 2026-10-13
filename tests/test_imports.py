@@ -13,7 +13,7 @@ from pathlib import Path
 
 import utlx
 from utlx.imports import import_static, import_file, import_absolute
-from utlx.platform import is_pypy
+from utlx.platform import is_graalpy
 
 
 class TestImportStatic(unittest.TestCase):
@@ -159,15 +159,14 @@ class TestImportAbsolute(unittest.TestCase):
         self.symlink = self.temp_dir / "cwd_link"
         try:
             self.symlink.symlink_to(self.cwd, target_is_directory=True)
-            self.has_symlink = True
+            self.symlink_supported = True
         except Exception:  # pragma: no cover
-            self.has_symlink = False
+            self.symlink_supported = False
         os.chdir(self.cwd)
 
     def tearDown(self):
-        if os.path.isdir(self.org_cwd):
+        if os.path.isdir(self.org_cwd):  # pragma: no branch
             os.chdir(self.org_cwd)
-        else: pass  # pragma: no cover
         shutil.rmtree(self.temp_dir)
         shutil.rmtree(self.cwd)
 
@@ -196,7 +195,7 @@ class TestImportAbsolute(unittest.TestCase):
         self.assertIn(str(self.cwd), sys.path)
 
     def test_removes_symlink_to_cwd(self):
-        if not self.has_symlink:
+        if is_graalpy and not self.symlink_supported:
             self.skipTest("Symlinks not supported on this platform")  # pragma: no cover
         sys.path.insert(0, str(self.symlink))
         with utlx.imports.import_absolute():

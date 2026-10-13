@@ -33,7 +33,8 @@ class TestPublicPrivate(unittest.TestCase):
         self.assertTrue(callable(test_func))
 
     def test_public_function_form_adds_single_name_repeated(self):
-        def test_func(): return 64
+        def test_func():
+            return 64
         result = public(test_func=test_func)
         result = public(test_func=test_func)
         self.assertEqual(result(), 64)

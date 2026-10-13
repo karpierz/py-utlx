@@ -5,12 +5,14 @@
 
 from ._detect import *
 from ._oid    import *
-from . import _limits as limits
 if is_windows:  # pragma: no cover
-    from .windows import arch as _arch
+    from .windows import arch as arch
+    from .windows import has_admin_privileges as has_admin_privileges
 elif is_linux:  # pragma: no cover
-    from .linux import arch as _arch
+    from .linux import arch as arch
+    from .linux import has_admin_privileges as has_admin_privileges
 elif is_macos:  # pragma: no cover
-    from .macos import arch as _arch
-from . import capi
-arch = _arch
+    from .macos import arch as arch
+    from .macos import has_admin_privileges as has_admin_privileges
+from . import capi as capi
+from . import _limits as limits

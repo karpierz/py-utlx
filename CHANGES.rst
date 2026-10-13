@@ -1,7 +1,18 @@
 Changelog
 =========
 
-2.4.1 (2026-06-01)
+2.5.4 (2026-10-10)
+------------------
+- Added support for PyPy 3.12
+- Added support for GraalPy 3.13
+- Full  support for GraalPy 3.12
+- Fixed compatibility bugs in stat.py for PyPy 3.12
+- Fix utlx.platform.is_32bits bug for GraalPy.
+- Added utlx.platform.has_admin_privileges().
+- Updated nox's default python to version 3.14
+- Setup updates, fixes and improvements.
+
+2.4.1 (2026-08-20)
 ------------------
 - Added (partial) support for GraalPy 3.12
 - Full support for Python 3.15

@@ -1,13 +1,13 @@
 # Copyright (c) 2018 Adam Karpierz
 # SPDX-License-Identifier: Zlib
 
-from ctypes.wintypes import HMODULE
+import ctypes
 from pathlib import Path
 
 __all__ = ('dll_path', 'python_dll_path')
 
 
-def dll_path(handle: HMODULE | int) -> Path | None:
+def dll_path(handle: ctypes.CDLL | int) -> Path | None:
     """Retrieves the fully qualified path for the file that contains the specified module.
 
     The module must have been loaded by the current process.
@@ -15,6 +15,7 @@ def dll_path(handle: HMODULE | int) -> Path | None:
     import ctypes
     from ctypes.wintypes import HMODULE, LPWSTR, DWORD
     MAX_PATH = 520
+    if isinstance(handle, ctypes.CDLL): handle = int(handle._handle)
     GetModuleFileNameW = ctypes.windll.kernel32.GetModuleFileNameW
     GetModuleFileNameW.restype  = DWORD
     GetModuleFileNameW.argtypes = [HMODULE, LPWSTR, DWORD]
@@ -38,6 +39,3 @@ def python_dll_path() -> Path | None:
     else:
         dllhandle = pythonapi._handle
     return dll_path(dllhandle)
-
-
-del HMODULE
